@@ -1,0 +1,6 @@
+{
+  "name": "گردونه شانس و قرعه‌کشی پرسنلی",
+  "description": "سامانه برگزاری مراسم قرعه‌کشی و گردونه شانس با ورودی اکسل، حذف برندگان قبلی و پشتیبانی از پس‌زمینه اختصاصی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

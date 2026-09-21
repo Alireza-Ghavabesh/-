@@ -1,0 +1,367 @@
+import React, { useState, useEffect } from 'react';
+import { Participant, Winner, AppSettings } from './types';
+import { getDemoParticipants } from './utils/excel';
+import { getWinnerOrdinalTitle } from './utils/format';
+import { LuckyWheel } from './components/LuckyWheel';
+import { StageHeader } from './components/StageHeader';
+import { WinnerModal } from './components/WinnerModal';
+import { ExcelUploadModal } from './components/ExcelUploadModal';
+import { WinnersListModal } from './components/WinnersListModal';
+import { BackgroundSettingsModal } from './components/BackgroundSettingsModal';
+import { Sparkles, Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw } from 'lucide-react';
+
+const DEFAULT_SETTINGS: AppSettings = {
+  prizeTitle: 'جایزه دور اول قرعه‌کشی',
+  spinDurationSeconds: 6.5,
+  maskMobile: true,
+  soundEnabled: true,
+  bgImageUrl: null,
+  bgDarkness: 30,
+  themePreset: 'royal-gold',
+};
+
+export default function App() {
+  // Clear any old persisted session state so reload always starts completely fresh
+  useEffect(() => {
+    try {
+      localStorage.removeItem('lottery_active_participants');
+      localStorage.removeItem('lottery_winners');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Master participant pool (the baseline list, e.g. 459 participants or uploaded excel)
+  const [masterParticipants, setMasterParticipants] = useState<Participant[]>(() => {
+    try {
+      const saved = localStorage.getItem('lottery_master_participants');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return getDemoParticipants(459);
+  });
+
+  // Active participants list (resets to full master list on every reload)
+  const [participants, setParticipants] = useState<Participant[]>(() => {
+    try {
+      const saved = localStorage.getItem('lottery_master_participants');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    // Default 459 participants on initial run as requested
+    return getDemoParticipants(459);
+  });
+
+  // Confirmed winners list in the current session (always starts empty on reload)
+  const [winners, setWinners] = useState<Winner[]>([]);
+
+  // Settings
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    try {
+      const saved = localStorage.getItem('lottery_settings');
+      const savedBg = localStorage.getItem('lottery_custom_bg');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          bgImageUrl: savedBg || parsed.bgImageUrl || null,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_SETTINGS;
+  });
+
+  // State management
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [pendingWinner, setPendingWinner] = useState<Participant | null>(null);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [isWinnersModalOpen, setIsWinnersModalOpen] = useState(false);
+  const [isBgModalOpen, setIsBgModalOpen] = useState(false);
+
+  // Current winner rank in this session (1 for برنده اول, 2 for برنده دوم, ...)
+  const currentWinnerRank = winners.length + 1;
+  const currentRankTitle = getWinnerOrdinalTitle(currentWinnerRank);
+
+  useEffect(() => {
+    try {
+      const copy = { ...settings };
+      // avoid saving huge base64 in the general settings object
+      if (copy.bgImageUrl && copy.bgImageUrl.length > 500) {
+        copy.bgImageUrl = 'CUSTOM_SAVED';
+      }
+      localStorage.setItem('lottery_settings', JSON.stringify(copy));
+    } catch {
+      // ignore
+    }
+  }, [settings]);
+
+  const updateSettings = (newSettings: Partial<AppSettings>) => {
+    setSettings((prev) => ({ ...prev, ...newSettings }));
+  };
+
+  const handleSpinStart = () => {
+    setIsSpinning(true);
+    setPendingWinner(null);
+  };
+
+  const handleSpinEnd = (winner: Participant) => {
+    setIsSpinning(false);
+    setPendingWinner(winner);
+  };
+
+  // Confirm winner: adds to winners list and removes from active participants
+  const handleConfirmWinner = (confirmedWinner: Winner) => {
+    const rankTitle = getWinnerOrdinalTitle(winners.length + 1);
+    const enrichedWinner: Winner = {
+      ...confirmedWinner,
+      drawRound: winners.length + 1,
+      winnerRankTitle: rankTitle,
+    };
+    setWinners((prev) => [enrichedWinner, ...prev]);
+    setParticipants((prev) => prev.filter((p) => p.id !== confirmedWinner.id));
+    setPendingWinner(null);
+  };
+
+  // Discard and redraw: ignores this result without removing the person
+  const handleDiscardAndRedraw = () => {
+    setPendingWinner(null);
+  };
+
+  // Restore a winner back to the active pool
+  const handleRestoreWinner = (winnerToRestore: Winner) => {
+    setWinners((prev) => prev.filter((w) => w.id !== winnerToRestore.id));
+    const restoredParticipant: Participant = {
+      id: winnerToRestore.id,
+      rowNumber: winnerToRestore.rowNumber,
+      fullName: winnerToRestore.fullName,
+      personnelCode: winnerToRestore.personnelCode,
+      mobile: winnerToRestore.mobile,
+      chargeCredit: winnerToRestore.chargeCredit,
+      creditDeferred: winnerToRestore.creditDeferred,
+      originalRowIndex: winnerToRestore.originalRowIndex,
+    };
+    setParticipants((prev) => [restoredParticipant, ...prev]);
+  };
+
+  const handleClearAllWinners = () => {
+    setWinners([]);
+  };
+
+  // Reset the current draw session: all master participants return to wheel and round starts at 1st winner
+  const handleResetSession = () => {
+    if (winners.length > 0) {
+      if (!confirm(`آیا مایلید قرعه‌کشی ریست شده و از «برنده اول» دوباره آغاز شود؟ (${winners.length} برنده ثبت شده به لیست افراد بازمی‌گردند)`)) {
+        return;
+      }
+    }
+    setParticipants(masterParticipants);
+    setWinners([]);
+    setPendingWinner(null);
+  };
+
+  const handleLoadNewParticipants = (newList: Participant[]) => {
+    setMasterParticipants(newList);
+    setParticipants(newList);
+    setWinners([]);
+    setPendingWinner(null);
+    try {
+      localStorage.setItem('lottery_master_participants', JSON.stringify(newList));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleResetToDemo = () => {
+    if (confirm('آیا مایلید لیست ۴۵۹ نفره پیش‌فرض بارگذاری و قرعه‌کشی از برنده اول آغاز شود؟')) {
+      const demo = getDemoParticipants(459);
+      setMasterParticipants(demo);
+      setParticipants(demo);
+      setWinners([]);
+      setPendingWinner(null);
+      try {
+        localStorage.setItem('lottery_master_participants', JSON.stringify(demo));
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  // Background Theme Gradient Classes
+  const getThemeBackground = () => {
+    if (settings.bgImageUrl) return '';
+    switch (settings.themePreset) {
+      case 'midnight-stage':
+        return 'bg-linear-to-b from-[#030712] via-[#0f172a] to-[#020617]';
+      case 'emerald-gala':
+        return 'bg-linear-to-b from-[#021d17] via-[#064e3b] to-[#021d17]';
+      case 'neon-festive':
+        return 'bg-linear-to-b from-[#1e102f] via-[#2e1065] to-[#0f0728]';
+      case 'royal-gold':
+      default:
+        return 'bg-linear-to-b from-[#090d16] via-[#16120b] to-[#080b12]';
+    }
+  };
+
+  return (
+    <div
+      className={`min-h-screen w-full relative flex flex-col justify-between text-slate-100 overflow-x-hidden selection:bg-amber-400 selection:text-slate-950 font-sans ${getThemeBackground()}`}
+      style={
+        settings.bgImageUrl
+          ? {
+              backgroundImage: `url(${settings.bgImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center center',
+              backgroundRepeat: 'no-repeat',
+            }
+          : undefined
+      }
+    >
+      {/* Background Darkness / Readability Overlay */}
+      {settings.bgImageUrl && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-300"
+          style={{
+            backgroundColor: `rgba(2, 6, 23, ${settings.bgDarkness / 100})`,
+          }}
+        />
+      )}
+
+      {/* Ambient Floating Dust / Golden Sparkles Canvas Simulation */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-40">
+        <div className="absolute top-1/4 left-1/6 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-1/4 right-1/6 w-96 h-96 bg-yellow-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s' }} />
+        <div className="absolute top-10 right-1/3 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+      </div>
+
+      {/* Stage Header Controls */}
+      <StageHeader
+        activeCount={participants.length}
+        winners={winners}
+        currentWinnerRank={currentWinnerRank}
+        settings={settings}
+        onUpdateSettings={updateSettings}
+        onOpenExcelModal={() => setIsExcelModalOpen(true)}
+        onOpenWinnersModal={() => setIsWinnersModalOpen(true)}
+        onOpenBgModal={() => setIsBgModalOpen(true)}
+        onResetSession={handleResetSession}
+        isSpinning={isSpinning}
+      />
+
+      {/* Main Wheel Stage */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center py-4 w-full">
+        <LuckyWheel
+          participants={participants}
+          currentWinnerRank={currentWinnerRank}
+          isSpinning={isSpinning}
+          onSpinStart={handleSpinStart}
+          onSpinEnd={handleSpinEnd}
+          spinDurationSeconds={settings.spinDurationSeconds}
+          maskMobile={settings.maskMobile}
+          prizeTitle={settings.prizeTitle}
+          disabled={participants.length === 0}
+        />
+      </main>
+
+      {/* Bottom Stage Status & Presenter Quick Links */}
+      <footer className="relative z-20 w-full px-4 py-2.5 bg-slate-950/60 backdrop-blur-md border-t border-white/10 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-slate-400">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1 text-slate-300">
+              <Users className="w-3.5 h-3.5 text-amber-400" />
+              افراد واجد شرایط در گردونه:
+              <strong className="text-white font-mono">{participants.length} نفر</strong>
+            </span>
+            <span className="text-slate-600 hidden sm:inline">•</span>
+            <span className="flex items-center gap-1 text-slate-300 hidden sm:flex">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              تعداد هدایای اهدا شده:
+              <strong className="text-amber-300 font-mono">{winners.length} نفر</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsExcelModalOpen(true)}
+              className="text-slate-300 hover:text-amber-300 transition flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>بارگذاری اکسل جدید</span>
+            </button>
+            <span className="text-slate-700">•</span>
+            <button
+              onClick={() => setIsBgModalOpen(true)}
+              className="text-slate-300 hover:text-amber-300 transition flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>تنظیم تصویر پس‌زمینه</span>
+            </button>
+            <span className="text-slate-700">•</span>
+            <button
+              onClick={handleResetSession}
+              title="شروع مجدد قرعه‌کشی از برنده اول"
+              className="text-amber-400/80 hover:text-amber-300 transition flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>شروع مجدد (برنده اول)</span>
+            </button>
+            <span className="text-slate-700">•</span>
+            <button
+              onClick={handleResetToDemo}
+              title="بارگذاری مجدد نمونه ۴۵۹ نفره آزمایشی"
+              className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <RefreshCcw className="w-3 h-3" />
+              <span className="hidden md:inline">نمونه ۴۵۹ نفر</span>
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {/* Winner Celebration Modal */}
+      <WinnerModal
+        winner={pendingWinner}
+        prizeTitle={settings.prizeTitle}
+        drawRound={winners.length + 1}
+        maskMobile={settings.maskMobile}
+        onConfirmWinner={handleConfirmWinner}
+        onDiscardAndRedraw={handleDiscardAndRedraw}
+      />
+
+      {/* Excel Upload & Manager Modal */}
+      <ExcelUploadModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onLoadParticipants={handleLoadNewParticipants}
+        currentCount={participants.length}
+      />
+
+      {/* Winners List Drawer / Modal */}
+      <WinnersListModal
+        isOpen={isWinnersModalOpen}
+        onClose={() => setIsWinnersModalOpen(false)}
+        winners={winners}
+        onRestoreWinner={handleRestoreWinner}
+        onClearAllWinners={handleClearAllWinners}
+      />
+
+      {/* Background Settings Modal */}
+      <BackgroundSettingsModal
+        isOpen={isBgModalOpen}
+        onClose={() => setIsBgModalOpen(false)}
+        settings={settings}
+        onUpdateSettings={updateSettings}
+      />
+    </div>
+  );
+}
