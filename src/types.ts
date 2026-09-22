@@ -40,7 +40,9 @@ export type ThemePreset = 'royal-gold' | 'midnight-stage' | 'emerald-gala' | 'ne
 
 export interface AppSettings {
   lotteryTitle: string; // عنوان قرعه‌کشی (متن بالای صفحه)
-  prizeTitle: string;
+  prizeTitle: string; // عنوان جایزه
+  loanAmount: string; // مقدار وام قرعه‌کشی (مثلاً ۵۰,۰۰۰,۰۰۰ ریال)
+  useSettingsLoanAmount: boolean; // اعمال این مبلغ وام برای کلیه برندگان
   spinDurationSeconds: number; // e.g. 5 to 10 seconds for suspense
   maskMobile: boolean; // hide middle digits on stage for privacy
   soundEnabled: boolean;

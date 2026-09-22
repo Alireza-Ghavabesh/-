@@ -13,6 +13,8 @@ interface LuckyWheelProps {
   spinDurationSeconds: number;
   maskMobile: boolean;
   prizeTitle: string;
+  loanAmount?: string;
+  useSettingsLoanAmount?: boolean;
   disabled?: boolean;
 }
 
@@ -43,6 +45,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   spinDurationSeconds,
   maskMobile,
   prizeTitle,
+  loanAmount,
+  useSettingsLoanAmount = true,
   disabled = false,
 }) => {
   const [rotation, setRotation] = useState(0);
@@ -393,12 +397,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                       تلفن: {formatMobile(rollerParticipant.mobile)}
                     </span>
                   </div>
-                  {rollerParticipant.creditDeferred && (
-                    <div className="text-xs font-bold text-amber-300 mt-1 flex items-center gap-1.5 font-mono bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/40">
-                      <span className="text-amber-400 text-[11px] font-sans font-medium">وام:</span>
-                      <span>{formatLoanAmount(rollerParticipant.creditDeferred).numeric}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const effectiveAmount = (useSettingsLoanAmount || !rollerParticipant.creditDeferred)
+                      ? (loanAmount || rollerParticipant.creditDeferred)
+                      : rollerParticipant.creditDeferred;
+                    if (!effectiveAmount) return null;
+                    return (
+                      <div className="text-xs font-bold text-amber-300 mt-1 flex items-center gap-1.5 font-mono bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/40">
+                        <span className="text-amber-400 text-[11px] font-sans font-medium">وام:</span>
+                        <span>{formatLoanAmount(effectiveAmount).numeric}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-slate-400 gap-2">

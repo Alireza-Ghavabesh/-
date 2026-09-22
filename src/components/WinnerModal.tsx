@@ -9,6 +9,8 @@ interface WinnerModalProps {
   prizeTitle: string;
   drawRound: number;
   maskMobile: boolean;
+  loanAmount?: string;
+  useSettingsLoanAmount?: boolean;
   onConfirmWinner: (confirmedWinner: Winner) => void;
   onDiscardAndRedraw: () => void;
 }
@@ -18,12 +20,19 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   prizeTitle,
   drawRound,
   maskMobile: initialMaskMobile,
+  loanAmount,
+  useSettingsLoanAmount = true,
   onConfirmWinner,
   onDiscardAndRedraw,
 }) => {
   const [showFullMobile, setShowFullMobile] = useState(!initialMaskMobile);
   const winnerRankTitle = getWinnerOrdinalTitle(drawRound);
-  const loanInfo = winner ? formatLoanAmount(winner.creditDeferred) : null;
+
+  const effectiveLoanRaw = (useSettingsLoanAmount || !winner?.creditDeferred)
+    ? (loanAmount || winner?.creditDeferred)
+    : winner?.creditDeferred;
+
+  const loanInfo = effectiveLoanRaw ? formatLoanAmount(effectiveLoanRaw) : (winner ? formatLoanAmount(winner.creditDeferred) : null);
 
   useEffect(() => {
     if (!winner) return;

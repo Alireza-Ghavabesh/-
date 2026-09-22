@@ -5,7 +5,7 @@ import initSqlJs, { Database } from 'sql.js';
 import { createServer as createViteServer } from 'vite';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const DB_FILE = path.join(process.cwd(), 'lottery.sqlite');
+const DB_FILE = path.join(process.cwd(), 'lottery.db');
 
 let db: Database;
 
@@ -20,6 +20,18 @@ function saveDb() {
 
 async function initDatabase() {
   const SQL = await initSqlJs();
+
+  // If old lottery.sqlite exists and lottery.db doesn't, migrate automatically
+  const oldSqliteFile = path.join(process.cwd(), 'lottery.sqlite');
+  if (!fs.existsSync(DB_FILE) && fs.existsSync(oldSqliteFile)) {
+    try {
+      fs.copyFileSync(oldSqliteFile, DB_FILE);
+      console.log('Migrated old lottery.sqlite to lottery.db');
+    } catch (e) {
+      console.warn('Could not copy old lottery.sqlite:', e);
+    }
+  }
+
   if (fs.existsSync(DB_FILE)) {
     try {
       const fileBuffer = fs.readFileSync(DB_FILE);

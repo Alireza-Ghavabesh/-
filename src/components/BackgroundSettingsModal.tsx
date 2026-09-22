@@ -1,7 +1,23 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { AppSettings, ThemePreset, CustomBackground } from '../types';
-import { Image as ImageIcon, Sparkles, Sliders, X, Upload, Trash2, Check, Database, Loader2, Edit3 } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Sparkles,
+  Sliders,
+  X,
+  Upload,
+  Trash2,
+  Check,
+  Database,
+  Loader2,
+  Edit3,
+  Coins,
+  Award,
+  Clock,
+  Settings,
+} from 'lucide-react';
 import { fetchBackgroundsFromDb, saveBackgroundToDb, activateBackgroundInDb, deleteBackgroundFromDb } from '../utils/api';
+import { formatLoanAmount } from '../utils/format';
 
 interface BackgroundSettingsModalProps {
   isOpen: boolean;
@@ -126,12 +142,12 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Sliders className="w-5 h-5 text-amber-400" />
+              <Settings className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">تنظیمات مراسم و صحنه قرعه‌کشی</h3>
+              <h3 className="text-lg font-bold text-white">تنظیمات سامانه و قرعه‌کشی</h3>
               <p className="text-xs text-slate-400">
-                تعیین عنوان بالای صفحه، تصویر پس‌زمینه سالن، تم‌های استیج و پروژکتور
+                تعیین عنوان قرعه‌کشی، مقدار وام، عنوان جایزه، سرعت گردونه و تم سالن
               </p>
             </div>
           </div>
@@ -144,31 +160,29 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
         </div>
 
         {/* Body */}
-        <div className="py-4 space-y-6 overflow-y-auto max-h-[75vh]">
-          {/* Ceremony / Lottery Title Section */}
-          <div className="bg-slate-950/70 border border-amber-500/40 rounded-2xl p-4.5 space-y-3 shadow-inner">
+        <div className="py-4 space-y-5 overflow-y-auto max-h-[75vh]">
+          {/* 1. Ceremony / Lottery Title Section */}
+          <div className="bg-slate-950/70 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 shadow-inner">
             <div className="flex items-center justify-between">
               <label htmlFor="input-lottery-title" className="text-sm font-bold text-amber-300 flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-amber-400" />
-                <span>عنوان اصلی قرعه‌کشی (متن بالای صفحه):</span>
+                <span>عنوان قرعه‌کشی (متن بالای صفحه):</span>
               </label>
-              <span className="text-[11px] text-slate-400">نمایش زنده در استیج</span>
+              <span className="text-[11px] text-slate-400">نمایش زنده در بالای صفحه</span>
             </div>
 
-            <div className="relative">
-              <input
-                id="input-lottery-title"
-                type="text"
-                value={settings.lotteryTitle}
-                onChange={(e) => onUpdateSettings({ lotteryTitle: e.target.value })}
-                placeholder="گردونه شانس و قرعه‌کشی"
-                className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white placeholder-slate-500 outline-none transition"
-              />
-            </div>
+            <input
+              id="input-lottery-title"
+              type="text"
+              value={settings.lotteryTitle}
+              onChange={(e) => onUpdateSettings({ lotteryTitle: e.target.value })}
+              placeholder="گردونه شانس و قرعه‌کشی"
+              className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm font-bold text-white placeholder-slate-500 outline-none transition"
+            />
 
             {/* Quick Title Suggestions Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[11px] text-slate-400 ml-1">نمونه‌های آماده:</span>
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[11px] text-slate-400 ml-1">پیش‌فرض‌ها:</span>
               {[
                 'گردونه شانس و قرعه‌کشی',
                 'مراسم قرعه‌کشی وام پرسنلی',
@@ -179,7 +193,7 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
                   key={suggestion}
                   type="button"
                   onClick={() => onUpdateSettings({ lotteryTitle: suggestion })}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                  className={`text-[11px] px-2.5 py-0.5 rounded-lg border transition cursor-pointer ${
                     settings.lotteryTitle === suggestion
                       ? 'bg-amber-400/20 text-amber-300 border-amber-400/60 font-bold'
                       : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700'
@@ -191,7 +205,147 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
             </div>
           </div>
 
-          {/* Custom Image Section */}
+          {/* 2. Loan Amount Section (مقدار وام از تنظیمات) */}
+          <div className="bg-slate-950/70 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-inner">
+            <div className="flex items-center justify-between">
+              <label htmlFor="input-loan-amount" className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span>مقدار وام قرعه‌کشی (به ریال):</span>
+              </label>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {formatLoanAmount(settings.loanAmount || '50000000').numeric}
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                id="input-loan-amount"
+                type="text"
+                value={settings.loanAmount || ''}
+                onChange={(e) => onUpdateSettings({ loanAmount: e.target.value })}
+                placeholder="مثال: 50000000 یا 50,000,000"
+                className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm font-black text-amber-300 font-mono placeholder-slate-500 outline-none transition"
+              />
+            </div>
+
+            {/* Real-time Display of Amount in Numbers and Words */}
+            {settings.loanAmount && (
+              <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                <span className="text-slate-300 flex items-center gap-1 font-medium">
+                  <span>نمایش در صفحه اعلام برنده:</span>
+                </span>
+                <div className="text-left sm:text-right font-bold text-amber-300">
+                  <span className="font-mono text-sm ml-1.5">{formatLoanAmount(settings.loanAmount).numeric}</span>
+                  {formatLoanAmount(settings.loanAmount).words && (
+                    <span className="text-amber-200/90 text-[11px]">({formatLoanAmount(settings.loanAmount).words})</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Loan Amount Buttons */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[11px] text-slate-400 ml-1">مبالغ رایج:</span>
+              {[
+                { label: '۵۰ میلیون ریال (۵ م.ت)', value: '50000000' },
+                { label: '۱۰۰ میلیون ریال (۱۰ م.ت)', value: '100000000' },
+                { label: '۲۰۰ میلیون ریال (۲۰ م.ت)', value: '200000000' },
+                { label: '۵۰۰ میلیون ریال (۵۰ م.ت)', value: '500000000' },
+                { label: '۱ میلیارد ریال (۱۰۰ م.ت)', value: '1000000000' },
+              ].map((preset) => {
+                const isMatch = (settings.loanAmount || '').replace(/[^\d]/g, '') === preset.value;
+                return (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => onUpdateSettings({ loanAmount: preset.value })}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                      isMatch
+                        ? 'bg-amber-400/20 text-amber-300 border-amber-400/60 font-bold'
+                        : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Apply to All Winners Toggle */}
+            <label className="flex items-center gap-2.5 pt-1 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={settings.useSettingsLoanAmount !== false}
+                onChange={(e) => onUpdateSettings({ useSettingsLoanAmount: e.target.checked })}
+                className="w-4 h-4 rounded accent-amber-400 cursor-pointer"
+              />
+              <span>اعمال این مقدار وام برای کلیه برندگان قرعه‌کشی</span>
+            </label>
+          </div>
+
+          {/* 3. Prize Title Section */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2.5 shadow-inner">
+            <div className="flex items-center justify-between">
+              <label htmlFor="input-prize-title" className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>عنوان جایزه قرعه‌کشی:</span>
+              </label>
+            </div>
+
+            <input
+              id="input-prize-title"
+              type="text"
+              value={settings.prizeTitle}
+              onChange={(e) => onUpdateSettings({ prizeTitle: e.target.value })}
+              placeholder="مثال: وام قرض‌الحسنه یا جایزه دور اول"
+              className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none transition"
+            />
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[11px] text-slate-400 ml-1">پیش‌فرض‌ها:</span>
+              {[
+                'وام قرض‌الحسنه',
+                'تسهیلات قرض‌الحسنه سازمانی',
+                'جایزه ویژه دوره اول',
+                'هدیه ممتاز پرسنلی',
+              ].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onUpdateSettings({ prizeTitle: p })}
+                  className={`text-[11px] px-2.5 py-0.5 rounded-lg border transition cursor-pointer ${
+                    settings.prizeTitle === p
+                      ? 'bg-amber-400/20 text-amber-300 border-amber-400/60 font-bold'
+                      : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Spin Duration Section */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span className="flex items-center gap-1.5 font-bold">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>مدت زمان چرخش گردونه و ایجاد هیجان:</span>
+              </span>
+              <span className="font-mono text-amber-300 font-bold">{settings.spinDurationSeconds} ثانیه</span>
+            </div>
+            <input
+              type="range"
+              min="3"
+              max="12"
+              step="0.5"
+              value={settings.spinDurationSeconds}
+              onChange={(e) => onUpdateSettings({ spinDurationSeconds: Number(e.target.value) })}
+              className="w-full accent-amber-400 cursor-pointer"
+            />
+          </div>
+
+          {/* 5. Custom Image Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-white flex items-center gap-2">

@@ -8,7 +8,7 @@ import { WinnerModal } from './components/WinnerModal';
 import { ExcelUploadModal } from './components/ExcelUploadModal';
 import { WinnersListModal } from './components/WinnersListModal';
 import { BackgroundSettingsModal } from './components/BackgroundSettingsModal';
-import { Sparkles, Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw } from 'lucide-react';
+import { Sparkles, Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw, Settings } from 'lucide-react';
 import {
   saveWinnerToDb,
   deleteWinnerFromDb,
@@ -23,6 +23,8 @@ import {
 const DEFAULT_SETTINGS: AppSettings = {
   lotteryTitle: 'گردونه شانس و قرعه‌کشی',
   prizeTitle: 'جایزه دور اول قرعه‌کشی',
+  loanAmount: '50000000',
+  useSettingsLoanAmount: true,
   spinDurationSeconds: 6.5,
   maskMobile: true,
   soundEnabled: true,
@@ -101,6 +103,9 @@ export default function App() {
           ...prev,
           lotteryTitle: dbSettings.lotteryTitle || prev.lotteryTitle,
           prizeTitle: dbSettings.prizeTitle || prev.prizeTitle,
+          loanAmount: dbSettings.loanAmount || prev.loanAmount,
+          useSettingsLoanAmount: dbSettings.useSettingsLoanAmount !== undefined ? (dbSettings.useSettingsLoanAmount === 'true' || dbSettings.useSettingsLoanAmount === '1') : prev.useSettingsLoanAmount,
+          spinDurationSeconds: dbSettings.spinDurationSeconds ? Number(dbSettings.spinDurationSeconds) : prev.spinDurationSeconds,
         }));
       }
     });
@@ -326,6 +331,8 @@ export default function App() {
           spinDurationSeconds={settings.spinDurationSeconds}
           maskMobile={settings.maskMobile}
           prizeTitle={settings.prizeTitle}
+          loanAmount={settings.loanAmount}
+          useSettingsLoanAmount={settings.useSettingsLoanAmount}
           disabled={participants.length === 0}
         />
       </main>
@@ -347,21 +354,24 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Small Gear Button for Settings in Footer */}
+            <button
+              id="btn-footer-settings"
+              onClick={() => setIsBgModalOpen(true)}
+              title="تنظیمات مراسم (عنوان، مقدار وام، جایزه، تصویر و سالن)"
+              className="text-amber-300 hover:text-amber-200 transition flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-amber-500/40 hover:border-amber-400/70 cursor-pointer shadow-xs"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-400" />
+              <span>تنظیمات</span>
+            </button>
+            <span className="text-slate-700">•</span>
             <button
               onClick={() => setIsExcelModalOpen(true)}
               className="text-slate-300 hover:text-amber-300 transition flex items-center gap-1 text-[11px] cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
               <span>بارگذاری اکسل جدید</span>
-            </button>
-            <span className="text-slate-700">•</span>
-            <button
-              onClick={() => setIsBgModalOpen(true)}
-              className="text-slate-300 hover:text-amber-300 transition flex items-center gap-1 text-[11px] cursor-pointer"
-            >
-              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-              <span>تنظیم تصویر پس‌زمینه</span>
             </button>
             <span className="text-slate-700">•</span>
             <button
@@ -385,12 +395,25 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Small floating gear at bottom-left corner for immediate access */}
+      <button
+        id="btn-bottom-floating-settings"
+        onClick={() => setIsBgModalOpen(true)}
+        title="تنظیمات سامانه و قرعه‌کشی"
+        className="fixed bottom-3.5 left-3.5 z-40 p-2.5 rounded-full bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700/80 hover:border-amber-400/60 shadow-xl backdrop-blur-md transition-all duration-300 hover:scale-105 cursor-pointer flex items-center justify-center group"
+      >
+        <Settings className="w-4 h-4 text-amber-400 group-hover:rotate-90 transition-transform duration-500" />
+        <span className="sr-only">تنظیمات</span>
+      </button>
+
       {/* Winner Celebration Modal */}
       <WinnerModal
         winner={pendingWinner}
         prizeTitle={settings.prizeTitle}
         drawRound={winners.length + 1}
         maskMobile={settings.maskMobile}
+        loanAmount={settings.loanAmount}
+        useSettingsLoanAmount={settings.useSettingsLoanAmount}
         onConfirmWinner={handleConfirmWinner}
         onDiscardAndRedraw={handleDiscardAndRedraw}
       />
