@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Participant, ExcelParseReport, Winner } from '../types';
+import { formatLoanAmount } from './format';
 
 /**
  * Parses an Excel or CSV file according to the user's specific rules:
@@ -8,8 +9,8 @@ import { Participant, ExcelParseReport, Winner } from '../types';
  *   2. نام و نام خانوادگی (Full Name)
  *   3. کد پرسنلی (Personnel Code)
  *   4. تلفن همراه (Mobile Number)
- *   5. اعتبار شارژی (Recharge Credit)
- *   6. اعتبار نسیه (Deferred Credit)
+ *   5. ستون ۵ (نادیده گرفته می‌شود)
+ *   6. مبلغ وام / نسیه (Loan Amount)
  * - Records start from Row 3 (1-based), meaning index 2 in array.
  * - The last row is NOT a person (e.g. summary/total/footer), so it excludes the final row.
  */
@@ -75,8 +76,8 @@ export async function parseParticipantsExcel(file: File): Promise<ExcelParseRepo
     // Col 1: نام و نام خانوادگی
     // Col 2: کد پرسنلی
     // Col 3: تلفن همراه
-    // Col 4: اعتبار شارژی
-    // Col 5: اعتبار نسیه
+    // Col 4: ستون ۵ (نادیده گرفته می‌شود)
+    // Col 5: مبلغ وام (نسیه)
     const rawRowNumber = row[0] !== undefined && row[0] !== '' ? String(row[0]).trim() : String(index + 1);
     const fullName = row[1] !== undefined ? String(row[1]).trim() : '';
     const personnelCode = row[2] !== undefined ? String(row[2]).trim() : '';
@@ -142,7 +143,7 @@ export function generateSampleExcelFile(participantCount = 459): void {
     // Row 1 (Excel Row 1): Document Title
     ['فهرست پرسنل شرکت - مراسم قرعه‌کشی سالانه و گردونه شانس', '', '', '', '', ''],
     // Row 2 (Excel Row 2): Column Headers
-    ['ردیف', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'اعتبار شارژی', 'اعتبار نسیه'],
+    ['ردیف', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'ستون اضافی', 'مبلغ وام (ریال)'],
   ];
 
   for (let i = 1; i <= participantCount; i++) {
@@ -229,11 +230,12 @@ export function exportWinnersToExcel(winners: Winner[]): void {
   if (winners.length === 0) return;
 
   const rows: (string | number)[][] = [
-    ['گزارش نهایی برندگان مراسم قرعه‌کشی و گردونه شانس', '', '', '', '', '', '', ''],
-    ['رتبه برنده', 'عنوان جایزه', 'ردیف اکسل', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'اعتبار شارژی', 'زمان ثبت'],
+    ['گزارش نهایی برندگان مراسم قرعه‌کشی و گردونه شانس', '', '', '', '', '', '', '', ''],
+    ['رتبه برنده', 'عنوان جایزه', 'ردیف اکسل', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'مبلغ وام (ریال)', 'مبلغ وام به حروف', 'زمان ثبت'],
   ];
 
   winners.forEach((w) => {
+    const loan = formatLoanAmount(w.creditDeferred);
     rows.push([
       w.winnerRankTitle || `برنده ${w.drawRound}`,
       w.prizeTitle,
@@ -241,7 +243,8 @@ export function exportWinnersToExcel(winners: Winner[]): void {
       w.fullName,
       w.personnelCode,
       w.mobile,
-      w.chargeCredit ?? '---',
+      w.loanAmount || loan.numeric,
+      w.loanWords || loan.words,
       w.wonAt,
     ]);
   });
@@ -255,8 +258,9 @@ export function exportWinnersToExcel(winners: Winner[]): void {
     { wch: 25 },
     { wch: 15 },
     { wch: 18 },
+    { wch: 20 },
+    { wch: 32 },
     { wch: 16 },
-    { wch: 22 },
   ];
 
   const wb = XLSX.utils.book_new();

@@ -138,6 +138,9 @@ export const WinnersListModal: React.FC<WinnersListModalProps> = ({
                       <Award className="w-3 h-3 text-amber-400 shrink-0" />
                       {w.prizeTitle}
                     </span>
+                    <span className="text-[11px] font-bold text-amber-300 font-mono">
+                      وام: {w.loanAmount || (w.creditDeferred ? `${w.creditDeferred} ریال` : '---')}
+                    </span>
                     <span className="text-[10px] text-slate-500">{w.wonAt}</span>
                   </div>
                   <div className="col-span-2 flex items-center justify-center">

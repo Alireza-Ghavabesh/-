@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Participant, Winner } from '../types';
-import { getWinnerOrdinalTitle } from '../utils/format';
-import { Trophy, Sparkles, CheckCircle2, RotateCcw, Award, User, Phone, CreditCard, Hash, Eye, EyeOff } from 'lucide-react';
+import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
+import { Trophy, Sparkles, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff } from 'lucide-react';
 
 interface WinnerModalProps {
   winner: Participant | null;
@@ -23,6 +23,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
 }) => {
   const [showFullMobile, setShowFullMobile] = useState(!initialMaskMobile);
   const winnerRankTitle = getWinnerOrdinalTitle(drawRound);
+  const loanInfo = winner ? formatLoanAmount(winner.creditDeferred) : null;
 
   useEffect(() => {
     if (!winner) return;
@@ -63,6 +64,8 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
       drawRound,
       winnerRankTitle,
       prizeTitle: prizeTitle || winnerRankTitle,
+      loanAmount: loanInfo?.numeric || '۰ ریال',
+      loanWords: loanInfo?.words || '',
     };
     onConfirmWinner(winnerRecord);
   };
@@ -152,18 +155,23 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
               </div>
             </div>
 
-            {/* Financial Credits */}
-            {(winner.chargeCredit || winner.creditDeferred) && (
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between col-span-2">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-amber-400" />
-                  اعتبار شارژی / نسیه:
-                </span>
-                <div className="font-semibold text-slate-300 text-xs">
-                  شارژی: {winner.chargeCredit || '۰'} | نسیه: {winner.creditDeferred || '۰'}
+            {/* Loan Amount (وام) - Exclusively from deferred credit/نسیه, completely ignoring charge credit */}
+            <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
+              <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
+                <Coins className="w-5 h-5 text-amber-400 shrink-0" />
+                <span>وام:</span>
+              </span>
+              <div className="flex flex-col sm:items-end text-right sm:text-left">
+                <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono tracking-wider drop-shadow-md">
+                  {loanInfo?.numeric || '۰ ریال'}
                 </div>
+                {loanInfo?.words && (
+                  <div className="text-xs sm:text-sm font-bold text-amber-100/90 mt-0.5 tracking-normal">
+                    ({loanInfo.words})
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 

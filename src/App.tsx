@@ -9,8 +9,19 @@ import { ExcelUploadModal } from './components/ExcelUploadModal';
 import { WinnersListModal } from './components/WinnersListModal';
 import { BackgroundSettingsModal } from './components/BackgroundSettingsModal';
 import { Sparkles, Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw } from 'lucide-react';
+import {
+  saveWinnerToDb,
+  deleteWinnerFromDb,
+  clearAllWinnersFromDb,
+  fetchParticipantsFromDb,
+  saveParticipantsToDb,
+  fetchBackgroundsFromDb,
+  fetchSettingsFromDb,
+  saveSettingsToDb,
+} from './utils/api';
 
 const DEFAULT_SETTINGS: AppSettings = {
+  lotteryTitle: 'گردونه شانس و قرعه‌کشی',
   prizeTitle: 'جایزه دور اول قرعه‌کشی',
   spinDurationSeconds: 6.5,
   maskMobile: true,
@@ -63,6 +74,38 @@ export default function App() {
   // Confirmed winners list in the current session (always starts empty on reload)
   const [winners, setWinners] = useState<Winner[]>([]);
 
+  // On mount, load any saved participants or active background from SQLite database
+  useEffect(() => {
+    fetchParticipantsFromDb().then((dbParticipants) => {
+      if (dbParticipants && dbParticipants.length > 0) {
+        setMasterParticipants(dbParticipants);
+        setParticipants(dbParticipants);
+      }
+    });
+
+    fetchBackgroundsFromDb().then((bgs) => {
+      if (bgs && bgs.length > 0) {
+        const activeBg = bgs.find((b) => b.isActive) || bgs[0];
+        if (activeBg && activeBg.imageBase64) {
+          setSettings((prev) => ({
+            ...prev,
+            bgImageUrl: activeBg.imageBase64,
+          }));
+        }
+      }
+    });
+
+    fetchSettingsFromDb().then((dbSettings) => {
+      if (dbSettings && Object.keys(dbSettings).length > 0) {
+        setSettings((prev) => ({
+          ...prev,
+          lotteryTitle: dbSettings.lotteryTitle || prev.lotteryTitle,
+          prizeTitle: dbSettings.prizeTitle || prev.prizeTitle,
+        }));
+      }
+    });
+  }, []);
+
   // Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -95,6 +138,9 @@ export default function App() {
 
   useEffect(() => {
     try {
+      if (settings.lotteryTitle) {
+        document.title = settings.lotteryTitle;
+      }
       const copy = { ...settings };
       // avoid saving huge base64 in the general settings object
       if (copy.bgImageUrl && copy.bgImageUrl.length > 500) {
@@ -108,6 +154,7 @@ export default function App() {
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
+    saveSettingsToDb(newSettings);
   };
 
   const handleSpinStart = () => {
@@ -120,7 +167,7 @@ export default function App() {
     setPendingWinner(winner);
   };
 
-  // Confirm winner: adds to winners list and removes from active participants
+  // Confirm winner: adds to winners list, saves to SQLite, and removes from active participants
   const handleConfirmWinner = (confirmedWinner: Winner) => {
     const rankTitle = getWinnerOrdinalTitle(winners.length + 1);
     const enrichedWinner: Winner = {
@@ -131,6 +178,9 @@ export default function App() {
     setWinners((prev) => [enrichedWinner, ...prev]);
     setParticipants((prev) => prev.filter((p) => p.id !== confirmedWinner.id));
     setPendingWinner(null);
+
+    // Save to SQLite database
+    saveWinnerToDb(enrichedWinner);
   };
 
   // Discard and redraw: ignores this result without removing the person
@@ -138,7 +188,7 @@ export default function App() {
     setPendingWinner(null);
   };
 
-  // Restore a winner back to the active pool
+  // Restore a winner back to the active pool and remove from SQLite
   const handleRestoreWinner = (winnerToRestore: Winner) => {
     setWinners((prev) => prev.filter((w) => w.id !== winnerToRestore.id));
     const restoredParticipant: Participant = {
@@ -152,10 +202,14 @@ export default function App() {
       originalRowIndex: winnerToRestore.originalRowIndex,
     };
     setParticipants((prev) => [restoredParticipant, ...prev]);
+
+    // Remove from SQLite
+    deleteWinnerFromDb(winnerToRestore.id);
   };
 
   const handleClearAllWinners = () => {
     setWinners([]);
+    clearAllWinnersFromDb();
   };
 
   // Reset the current draw session: all master participants return to wheel and round starts at 1st winner
@@ -168,6 +222,7 @@ export default function App() {
     setParticipants(masterParticipants);
     setWinners([]);
     setPendingWinner(null);
+    clearAllWinnersFromDb();
   };
 
   const handleLoadNewParticipants = (newList: Participant[]) => {
@@ -175,6 +230,7 @@ export default function App() {
     setParticipants(newList);
     setWinners([]);
     setPendingWinner(null);
+    saveParticipantsToDb(newList, true);
     try {
       localStorage.setItem('lottery_master_participants', JSON.stringify(newList));
     } catch {
@@ -189,6 +245,7 @@ export default function App() {
       setParticipants(demo);
       setWinners([]);
       setPendingWinner(null);
+      saveParticipantsToDb(demo, true);
       try {
         localStorage.setItem('lottery_master_participants', JSON.stringify(demo));
       } catch {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Participant } from '../types';
 import { sound } from '../utils/audio';
-import { getWinnerOrdinalTitle } from '../utils/format';
+import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
 import { Play, Sparkles, Volume2, VolumeX, Shuffle, Eye, EyeOff } from 'lucide-react';
 
 interface LuckyWheelProps {
@@ -393,9 +393,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                       تلفن: {formatMobile(rollerParticipant.mobile)}
                     </span>
                   </div>
-                  {rollerParticipant.chargeCredit && (
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      اعتبار شارژی: {rollerParticipant.chargeCredit}
+                  {rollerParticipant.creditDeferred && (
+                    <div className="text-xs font-bold text-amber-300 mt-1 flex items-center gap-1.5 font-mono bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/40">
+                      <span className="text-amber-400 text-[11px] font-sans font-medium">وام:</span>
+                      <span>{formatLoanAmount(rollerParticipant.creditDeferred).numeric}</span>
                     </div>
                   )}
                 </div>

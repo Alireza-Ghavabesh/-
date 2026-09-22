@@ -4,8 +4,8 @@ export interface Participant {
   fullName: string; // نام و نام خانوادگی
   personnelCode: string; // کد پرسنلی
   mobile: string; // تلفن همراه
-  chargeCredit?: string | number; // اعتبار شارژی
-  creditDeferred?: string | number; // اعتبار نسیه
+  chargeCredit?: string | number;
+  creditDeferred?: string | number; // مبلغ وام (ریال)
   originalRowIndex: number; // شماره سطر در اکسل
 }
 
@@ -14,6 +14,16 @@ export interface Winner extends Participant {
   drawRound: number; // شماره ترتیب برنده (1, 2, 3...)
   winnerRankTitle: string; // برنده اول، برنده دوم، برنده سوم، ...
   prizeTitle: string; // عنوان جایزه
+  loanAmount?: string; // مبلغ وام (ریال)
+  loanWords?: string; // مبلغ وام به حروف
+}
+
+export interface CustomBackground {
+  id: string;
+  name: string;
+  imageBase64: string;
+  isActive: boolean;
+  createdAt?: string;
 }
 
 export interface ExcelParseReport {
@@ -29,6 +39,7 @@ export interface ExcelParseReport {
 export type ThemePreset = 'royal-gold' | 'midnight-stage' | 'emerald-gala' | 'neon-festive';
 
 export interface AppSettings {
+  lotteryTitle: string; // عنوان قرعه‌کشی (متن بالای صفحه)
   prizeTitle: string;
   spinDurationSeconds: number; // e.g. 5 to 10 seconds for suspense
   maskMobile: boolean; // hide middle digits on stage for privacy

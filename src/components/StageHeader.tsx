@@ -16,6 +16,8 @@ import {
   Users,
   Award,
   RotateCcw,
+  Edit3,
+  Sliders,
 } from 'lucide-react';
 
 interface StageHeaderProps {
@@ -46,6 +48,8 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditingPrize, setIsEditingPrize] = useState(false);
   const [tempPrize, setTempPrize] = useState(settings.prizeTitle);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState(settings.lotteryTitle || 'گردونه شانس و قرعه‌کشی');
 
   const currentRankTitle = getWinnerOrdinalTitle(currentWinnerRank);
 
@@ -68,6 +72,13 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
     setIsEditingPrize(false);
   };
 
+  const handleTitleSave = () => {
+    if (tempTitle.trim()) {
+      onUpdateSettings({ lotteryTitle: tempTitle.trim() });
+    }
+    setIsEditingTitle(false);
+  };
+
   const toggleSound = () => {
     const next = !settings.soundEnabled;
     sound.enabled = next;
@@ -86,12 +97,45 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
             </div>
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-              <span>گردونه شانس و قرعه‌کشی</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                مراسم زنده
-              </span>
-            </h1>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-amber-400 rounded-xl px-2.5 py-1">
+                <input
+                  type="text"
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTitleSave();
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                  className="bg-transparent text-sm sm:text-base font-black text-white outline-none w-44 sm:w-64"
+                  placeholder="عنوان قرعه‌کشی..."
+                  autoFocus
+                />
+                <button
+                  onClick={handleTitleSave}
+                  className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2.5 py-1 rounded-lg cursor-pointer transition"
+                >
+                  ذخیره
+                </button>
+              </div>
+            ) : (
+              <h1
+                onClick={() => {
+                  setTempTitle(settings.lotteryTitle || 'گردونه شانس و قرعه‌کشی');
+                  setIsEditingTitle(true);
+                }}
+                className="text-base sm:text-lg font-black text-white flex items-center gap-2 cursor-pointer group select-none"
+                title="برای تغییر عنوان قرعه‌کشی کلیک کنید یا از دکمه تنظیمات استفاده کنید"
+              >
+                <span className="group-hover:text-amber-300 transition underline decoration-dotted decoration-amber-400/50 underline-offset-4">
+                  {settings.lotteryTitle || 'گردونه شانس و قرعه‌کشی'}
+                </span>
+                <Edit3 className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 transition shrink-0" />
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
+                  مراسم زنده
+                </span>
+              </h1>
+            )}
             <p className="text-[11px] text-slate-400 hidden sm:block">
               سامانه قرعه‌کشی پرسنلی با اکسل و حذف برندگان ادوار گذشته
             </p>
@@ -180,24 +224,28 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
             </button>
           )}
 
-          {/* Excel Modal Trigger */}
+          {/* Excel Modal Trigger - Prominent button */}
           <button
+            id="btn-open-excel-modal"
             onClick={onOpenExcelModal}
             disabled={isSpinning}
-            title="بارگذاری فایل اکسل"
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-400 transition cursor-pointer"
+            title="بارگذاری فایل اکسل اختصاصی"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 text-emerald-300 hover:text-white transition cursor-pointer shadow-sm shadow-emerald-950/50 text-xs font-bold"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="hidden sm:inline">بارگذاری اکسل</span>
           </button>
 
-          {/* Background Settings Modal Trigger */}
+          {/* Settings Modal Trigger */}
           <button
+            id="btn-open-settings-modal"
             onClick={onOpenBgModal}
             disabled={isSpinning}
-            title="تنظیمات تصویر پس‌زمینه سالن"
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+            title="تنظیمات عنوان قرعه‌کشی، پس‌زمینه و سالن"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 text-xs font-semibold transition cursor-pointer"
           >
-            <ImageIcon className="w-4 h-4" />
+            <Sliders className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="hidden sm:inline">تنظیمات</span>
           </button>
 
           {/* Privacy Mobile Mask Toggle */}

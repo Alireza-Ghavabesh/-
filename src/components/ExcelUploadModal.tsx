@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { parseParticipantsExcel, generateSampleExcelFile, getDemoParticipants } from '../utils/excel';
 import { Participant, ExcelParseReport } from '../types';
+import { formatLoanAmount } from '../utils/format';
 import { FileSpreadsheet, Upload, Download, CheckCircle2, AlertCircle, Users, Search, RefreshCw, X } from 'lucide-react';
 
 interface ExcelUploadModalProps {
@@ -135,8 +136,8 @@ export const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
               <span className="bg-slate-800/80 px-2 py-1 rounded">۲. نام و نام خانوادگی</span>
               <span className="bg-slate-800/80 px-2 py-1 rounded">۳. کد پرسنلی</span>
               <span className="bg-slate-800/80 px-2 py-1 rounded">۴. تلفن همراه</span>
-              <span className="bg-slate-800/80 px-2 py-1 rounded">۵. اعتبار شارژی</span>
-              <span className="bg-slate-800/80 px-2 py-1 rounded">۶. اعتبار نسیه</span>
+              <span className="bg-slate-800/80 px-2 py-1 rounded text-slate-500">۵. ستون ۵ (نادیده)</span>
+              <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-bold">۶. مبلغ وام (نسیه)</span>
             </div>
             <p className="text-[11px] text-amber-200/80 pt-1">
               ✓ رکورد اول از <strong>سطر ۳</strong> اکسل آغاز می‌شود و <strong>سطر آخر اکسل</strong> به عنوان ردیف جمع‌کل نادیده گرفته خواهد شد.
@@ -259,7 +260,7 @@ export const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                   <span className="col-span-2">نام و نام خانوادگی</span>
                   <span>کد پرسنلی</span>
                   <span>تلفن همراه</span>
-                  <span>اعتبار شارژی</span>
+                  <span>مبلغ وام</span>
                 </div>
                 {filteredPreview.slice(0, 50).map((p, idx) => (
                   <div
@@ -270,7 +271,7 @@ export const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                     <span className="col-span-2 font-medium text-white truncate">{p.fullName}</span>
                     <span className="font-mono text-amber-300/90">{p.personnelCode}</span>
                     <span className="font-mono text-slate-400">{p.mobile}</span>
-                    <span className="text-slate-400">{p.chargeCredit || '۰'}</span>
+                    <span className="text-amber-300 font-mono text-xs font-semibold">{formatLoanAmount(p.creditDeferred).numeric}</span>
                   </div>
                 ))}
                 {filteredPreview.length > 50 && (
