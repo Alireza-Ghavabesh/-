@@ -76,27 +76,27 @@ export async function parseParticipantsExcel(file: File): Promise<ExcelParseRepo
     // Col 1: نام و نام خانوادگی
     // Col 2: کد پرسنلی
     // Col 3: تلفن همراه
-    // Col 4: ستون ۵ (نادیده گرفته می‌شود)
-    // Col 5: مبلغ وام (نسیه)
+    // Col 4: تاریخ استخدام حکم کارگزینی (یا ستون اضافی)
+    // Col 5: مبلغ وام (در صورت وجود)
     const rawRowNumber = row[0] !== undefined && row[0] !== '' ? String(row[0]).trim() : String(index + 1);
     const fullName = row[1] !== undefined ? String(row[1]).trim() : '';
     const personnelCode = row[2] !== undefined ? String(row[2]).trim() : '';
     const mobile = row[3] !== undefined ? String(row[3]).trim() : '';
-    const chargeCredit = row[4] !== undefined ? String(row[4]).trim() : '';
+    const employmentDate = row[4] !== undefined ? String(row[4]).trim() : '';
     const creditDeferred = row[5] !== undefined ? String(row[5]).trim() : '';
 
     // If there is no name and no personnel code, ignore this row
-    if (!fullName && !personnelCode) {
+    if (!fullName && !personnelCode && !rawRowNumber) {
       return;
     }
 
     participants.push({
       id: `p-${item.originalExcelRowNumber}-${Math.random().toString(36).substring(2, 7)}`,
       rowNumber: rawRowNumber || index + 1,
-      fullName: fullName || `پرسنل کد ${personnelCode}`,
+      fullName: fullName || `پرسنل ردیف ${rawRowNumber || index + 1}`,
       personnelCode: personnelCode || '---',
       mobile: mobile || '---',
-      chargeCredit: chargeCredit || '0',
+      employmentDate: employmentDate || undefined,
       creditDeferred: creditDeferred || '0',
       originalRowIndex: item.originalExcelRowNumber,
     });

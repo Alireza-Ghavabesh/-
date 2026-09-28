@@ -1,58 +1,6 @@
 /**
- * Helper to convert numbers to Persian ordinal words (اول، دوم، سوم، چهارم، ...)
- */
-export function getPersianOrdinal(n: number): string {
-  const ordinals: Record<number, string> = {
-    1: 'اول',
-    2: 'دوم',
-    3: 'سوم',
-    4: 'چهارم',
-    5: 'پنجم',
-    6: 'ششم',
-    7: 'هفتم',
-    8: 'هشتم',
-    9: 'نهم',
-    10: 'دهم',
-    11: 'یازدهم',
-    12: 'دوازدهم',
-    13: 'سیزدهم',
-    14: 'چهاردهم',
-    15: 'پانزدهم',
-    16: 'شانزدهم',
-    17: 'هفدهم',
-    18: 'هجدهم',
-    19: 'نوزدهم',
-    20: 'بیستم',
-    21: 'بیست و یکم',
-    22: 'بیست و دوم',
-    23: 'بیست و سوم',
-    24: 'بیست و چهارم',
-    25: 'بیست و پنجم',
-    26: 'بیست و ششم',
-    27: 'بیست و هفتم',
-    28: 'بیست و هشتم',
-    29: 'بیست و نهم',
-    30: 'سی‌ام',
-    31: 'سی و یکم',
-    32: 'سی و دوم',
-    33: 'سی و سوم',
-    34: 'سی و چهارم',
-    35: 'سی و پنجم',
-    40: 'چهلم',
-    50: 'پنجاهم',
-  };
-
-  if (ordinals[n]) return ordinals[n];
-  return `${n}ـُم`;
-}
-
-export function getWinnerOrdinalTitle(rank: number): string {
-  return `برنده ${getPersianOrdinal(rank)}`;
-}
-
-/**
- * Converts any number (or string with Persian/English digits) into Persian words (به حروف).
- * E.g., 50000000 -> "پنجاه میلیون"
+ * Converts any number (or string with Persian/English digits) into Persian cardinal words (به حروف).
+ * E.g., 50000000 -> "پنجاه میلیون", 36 -> "سی و شش"
  */
 export function numberToPersianWords(input: number | string | null | undefined): string {
   if (input === null || input === undefined || input === '') return '';
@@ -127,6 +75,102 @@ export function numberToPersianWords(input: number | string | null | undefined):
 }
 
 /**
+ * Converts cardinal Persian words into ordinal form:
+ * E.g.,
+ * 1 -> اول
+ * 2 -> دوم
+ * 3 -> سوم
+ * 20 -> بیستم
+ * 30 -> سی‌ام
+ * 36 -> سی و ششم
+ * 100 -> صدم
+ * 101 -> یکصد و یکم
+ * 320 -> سیصد و بیستم
+ */
+export function cardinalToOrdinal(cardinal: string): string {
+  if (!cardinal) return '';
+
+  const trimmed = cardinal.trim();
+
+  // If ends with "یک" (e.g. "یک", "بیست و یک", "سی و یک", "یکصد و یک")
+  if (trimmed === 'یک') {
+    return 'اول';
+  }
+  if (trimmed.endsWith(' یک')) {
+    return trimmed.slice(0, -3) + ' یکم';
+  }
+
+  // If ends with "سه" (e.g. "سه", "بیست و سه", "سی و سه")
+  if (trimmed.endsWith('سه')) {
+    return trimmed.slice(0, -2) + 'سوم';
+  }
+
+  // If ends with "سی" (e.g. "سی", "یکصد و سی")
+  if (trimmed.endsWith('سی')) {
+    return trimmed + '‌ام'; // نیم‌فاصله + ام -> سی‌ام
+  }
+
+  // If ends with "صد" (e.g. "یکصد", "دویست و ...") -> "صدم"
+  if (trimmed.endsWith('صد')) {
+    return trimmed + 'م';
+  }
+
+  // Standard case: add "م" to the end (e.g. "دو" -> "دوم", "چهار" -> "چهارم", "شش" -> "ششم", "بیست" -> "بیستم")
+  return trimmed + 'م';
+}
+
+/**
+ * Helper to convert ANY number to Persian ordinal words (اول، دوم، سوم ... سی و ششم ... صدم ... هزارم)
+ * Works systematically for 1 to millions!
+ */
+export function getPersianOrdinal(n: number): string {
+  if (!n || n <= 0) return '';
+
+  // Fast exact map for common base numbers
+  const fastMap: Record<number, string> = {
+    1: 'اول',
+    2: 'دوم',
+    3: 'سوم',
+    4: 'چهارم',
+    5: 'پنجم',
+    6: 'ششم',
+    7: 'هفتم',
+    8: 'هشتم',
+    9: 'نهم',
+    10: 'دهم',
+    11: 'یازدهم',
+    12: 'دوازدهم',
+    13: 'سیزدهم',
+    14: 'چهاردهم',
+    15: 'پانزدهم',
+    16: 'شانزدهم',
+    17: 'هفدهم',
+    18: 'هجدهم',
+    19: 'نوزدهم',
+    20: 'بیستم',
+    30: 'سی‌ام',
+    40: 'چهلم',
+    50: 'پنجاهم',
+    60: 'شصتم',
+    70: 'هفتادم',
+    80: 'هشتادم',
+    90: 'نودم',
+    100: 'صدم',
+  };
+
+  if (fastMap[n]) {
+    return fastMap[n];
+  }
+
+  const cardinal = numberToPersianWords(n);
+  return cardinalToOrdinal(cardinal);
+}
+
+export function getWinnerOrdinalTitle(rank: number): string {
+  return `برنده ${getPersianOrdinal(rank)}`;
+}
+
+/**
  * Formats a loan amount (from creditDeferred/نسیه) into:
  * - numeric: "۵۰,۰۰۰,۰۰۰ ریال"
  * - words: "پنجاه میلیون ریال"
@@ -164,15 +208,13 @@ export function formatLoanAmount(amount: number | string | null | undefined): {
     };
   }
 
-  const numericValue = parseInt(cleanStr, 10);
-  const formattedWithCommas = numericValue.toLocaleString('fa-IR');
-  const wordsRepresentation = numberToPersianWords(numericValue);
+  const num = parseInt(cleanStr, 10);
+  const words = numberToPersianWords(num);
 
   return {
     raw: cleanStr,
-    numeric: `${formattedWithCommas} ریال`,
-    words: wordsRepresentation ? `${wordsRepresentation} ریال` : '',
-    hasValue: numericValue > 0,
+    numeric: `${num.toLocaleString('fa-IR')} ریال`,
+    words: `${words} ریال`,
+    hasValue: true,
   };
 }
-

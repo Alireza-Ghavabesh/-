@@ -129,18 +129,18 @@ export const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
           <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-1.5">
             <div className="font-bold text-amber-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-amber-400" />
-              <span>قوانین استخراج ستون‌ها مطابق فرمت سازمان:</span>
+              <span>ترتیب ستون‌های فایل اکسل:</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 font-mono text-[11px] text-slate-300">
-              <span className="bg-slate-800/80 px-2 py-1 rounded">۱. ردیف</span>
+              <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-bold">۱. ردیف (مهم برای قرعه‌کشی)</span>
               <span className="bg-slate-800/80 px-2 py-1 rounded">۲. نام و نام خانوادگی</span>
               <span className="bg-slate-800/80 px-2 py-1 rounded">۳. کد پرسنلی</span>
               <span className="bg-slate-800/80 px-2 py-1 rounded">۴. تلفن همراه</span>
-              <span className="bg-slate-800/80 px-2 py-1 rounded text-slate-500">۵. ستون ۵ (نادیده)</span>
-              <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-bold">۶. مبلغ وام (نسیه)</span>
+              <span className="bg-slate-800/80 px-2 py-1 rounded text-slate-400">۵. تاریخ استخدام حکم کارگزینی</span>
+              <span className="bg-slate-800/80 px-2 py-1 rounded text-slate-400">۶. ستون‌های اختیاری دیگر</span>
             </div>
             <p className="text-[11px] text-amber-200/80 pt-1">
-              ✓ رکورد اول از <strong>سطر ۳</strong> اکسل آغاز می‌شود و <strong>سطر آخر اکسل</strong> به عنوان ردیف جمع‌کل نادیده گرفته خواهد شد.
+              ✓ رکورد افراد از <strong>سطر ۳</strong> آغاز می‌شود (سطر ۱ و ۲ عناوین) و <strong>سطر پایانی اکسل</strong> (در صورت وجود جمع کل) نادیده گرفته می‌شود.
             </p>
           </div>
 

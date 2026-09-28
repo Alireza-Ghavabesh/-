@@ -1,8 +1,36 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Estedad';
+  src: url('/fonts/Estedad-Medium.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Estedad';
+  src: url('/fonts/Estedad-Medium.woff2') format('woff2');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Yekan';
+  src: url('/fonts/Estedad-Medium.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
+  * {
+    font-family: 'Estedad', 'Yekan', 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  }
+
   body {
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Estedad', 'Yekan', 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
     direction: rtl;
     text-align: right;
     overflow-x: hidden;

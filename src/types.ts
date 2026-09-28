@@ -4,6 +4,7 @@ export interface Participant {
   fullName: string; // نام و نام خانوادگی
   personnelCode: string; // کد پرسنلی
   mobile: string; // تلفن همراه
+  employmentDate?: string; // تاریخ استخدام حکم کارگزینی
   chargeCredit?: string | number;
   creditDeferred?: string | number; // مبلغ وام (ریال)
   originalRowIndex: number; // شماره سطر در اکسل
@@ -16,6 +17,21 @@ export interface Winner extends Participant {
   prizeTitle: string; // عنوان جایزه
   loanAmount?: string; // مبلغ وام (ریال)
   loanWords?: string; // مبلغ وام به حروف
+}
+
+export interface LotterySession {
+  id: string;
+  title: string; // نام قرعه‌کشی
+  date: string; // تاریخ قرعه‌کشی (مثلاً ۱۴۰۴/۰۷/۰۳)
+  loanAmount: string; // مبلغ وام (مثلاً ۵۰,۰۰۰,۰۰۰ ریال)
+  maxWinnersCount: number; // سقف تعداد برندگان این قرعه‌کشی (مثلاً ۵۰ یا ۱۵۰ نفر)
+  status: 'active' | 'completed'; // وضعیت (در حال اجرا / پایان یافته)
+  totalParticipantsCount: number; // تعداد کل افراد وارد شده با اکسل (مثلاً ۳۲۰ نفر)
+  winners: Winner[]; // لیست نهایی برندگان این قرعه‌کشی
+  participants?: Participant[]; // لیست اختصاصی شرکت‌کنندگان این قرعه‌کشی
+  excelFileName?: string; // نام فایل اکسل اختصاصی بارگذاری شده
+  createdAt: string;
+  completedAt?: string;
 }
 
 export interface CustomBackground {

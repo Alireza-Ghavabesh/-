@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Participant, Winner } from '../types';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
-import { Trophy, Sparkles, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff } from 'lucide-react';
+import { Trophy, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff } from 'lucide-react';
 
 interface WinnerModalProps {
   winner: Participant | null;
@@ -103,8 +103,6 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
               <Trophy className="w-10 h-10 md:w-12 md:h-12 text-amber-300" />
             </div>
           </div>
-          <Sparkles className="absolute -top-2 -right-2 w-7 h-7 text-yellow-300 animate-spin" style={{ animationDuration: '6s' }} />
-          <Sparkles className="absolute -bottom-1 -left-2 w-6 h-6 text-amber-400 animate-pulse" />
         </div>
 
         {/* Stage Titles */}
@@ -121,8 +119,11 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
         </p>
 
         {/* Winner Big Spotlight Card */}
-        <div className="w-full bg-slate-950/80 border border-amber-400/50 rounded-2xl p-5 mb-6 shadow-inner flex flex-col items-center">
-          <div className="text-3xl md:text-4xl font-black text-white tracking-wide text-center drop-shadow-[0_2px_10px_rgba(251,191,36,0.3)] mb-4">
+        <div className="w-full bg-slate-950/85 border-2 border-amber-400/70 rounded-3xl p-6 md:p-8 mb-6 shadow-[0_0_40px_rgba(251,191,36,0.15)] flex flex-col items-center">
+          <span className="text-xs md:text-sm font-bold text-amber-400/90 tracking-widest uppercase mb-1">
+            برنده خوش‌شانس این دور
+          </span>
+          <div className="text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight text-center drop-shadow-[0_4px_20px_rgba(251,191,36,0.5)] my-3 leading-tight select-all">
             {winner.fullName}
           </div>
 
@@ -143,25 +144,6 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
                 ردیف اکسل:
               </span>
               <span className="font-bold text-white font-mono text-base">{winner.rowNumber}</span>
-            </div>
-
-            {/* Mobile Number with Privacy Mask */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between col-span-2">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <Phone className="w-4 h-4 text-amber-400" />
-                تلفن همراه:
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-amber-200 font-mono text-base">{getDisplayMobile()}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowFullMobile(!showFullMobile)}
-                  title={showFullMobile ? 'مخفی‌سازی شماره' : 'نمایش کامل شماره'}
-                  className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition cursor-pointer"
-                >
-                  {showFullMobile ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
             </div>
 
             {/* Loan Amount (وام) - Exclusively from deferred credit/نسیه, completely ignoring charge credit */}

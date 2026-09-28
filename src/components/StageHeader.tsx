@@ -11,10 +11,10 @@ import {
   Minimize2,
   Eye,
   EyeOff,
-  Sparkles,
   Users,
   Award,
   RotateCcw,
+  Settings,
 } from 'lucide-react';
 
 interface StageHeaderProps {
@@ -23,11 +23,17 @@ interface StageHeaderProps {
   currentWinnerRank: number;
   settings: AppSettings;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => void;
-  onOpenExcelModal: () => void;
+  onOpenExcelModal?: () => void;
   onOpenWinnersModal: () => void;
   onOpenBgModal?: () => void;
+  onOpenSessionsModal?: () => void;
   onResetSession: () => void;
+  onFinishSession?: () => void;
   isSpinning: boolean;
+  hasLotterySession?: boolean;
+  activeSessionTitle?: string;
+  activeSessionDate?: string;
+  activeSessionMaxWinners?: number;
 }
 
 export const StageHeader: React.FC<StageHeaderProps> = ({
@@ -38,8 +44,15 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
   onUpdateSettings,
   onOpenExcelModal,
   onOpenWinnersModal,
+  onOpenBgModal,
+  onOpenSessionsModal,
   onResetSession,
+  onFinishSession,
   isSpinning,
+  hasLotterySession = true,
+  activeSessionTitle,
+  activeSessionDate,
+  activeSessionMaxWinners,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -71,36 +84,66 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-amber-400 via-amber-500 to-yellow-600 p-0.5 shadow-lg shadow-amber-500/20">
             <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-amber-300" />
+              <Trophy className="w-5 h-5 text-amber-300" />
             </div>
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-black text-white flex items-center gap-2 select-none">
-              <span>{settings.lotteryTitle || 'گردونه شانس و قرعه‌کشی'}</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
-                مراسم زنده
+              <span>{hasLotterySession ? (settings.lotteryTitle || 'گردونه شانس و قرعه‌کشی') : 'سامانه جامع قرعه‌کشی پرسنلی'}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                hasLotterySession
+                  ? 'bg-amber-400/20 text-amber-300 border-amber-400/30'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}>
+                {hasLotterySession ? 'مراسم زنده' : 'آماده‌سازی'}
               </span>
             </h1>
             <p className="text-[11px] text-slate-400 hidden sm:block">
-              سامانه قرعه‌کشی پرسنلی با اکسل و حذف برندگان ادوار گذشته
+              {hasLotterySession
+                ? 'سامانه قرعه‌کشی پرسنلی با اکسل و حذف برندگان ادوار گذشته'
+                : 'برای شروع مراسم، ابتدا از منو یک قرعه‌کشی جدید تعریف کنید'}
             </p>
           </div>
         </div>
 
         {/* Center: Current Draw Rank & Badges */}
         <div className="flex items-center gap-2">
-          {/* Current Winner Rank Badge */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-xs font-bold text-amber-300 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-amber-200">نوبت قرعه:</span>
-            <span className="text-white font-black">{currentRankTitle}</span>
-          </div>
+          {/* Lottery Sessions & Archive Button */}
+          {onOpenSessionsModal && (
+            <button
+              onClick={onOpenSessionsModal}
+              disabled={isSpinning}
+              title="مدیریت، تعریف قرعه‌کشی جدید و بایگانی دوره‌ها"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs ${
+                hasLotterySession
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-400/50 text-amber-300'
+                  : 'bg-amber-500 text-slate-950 hover:bg-amber-400 border-amber-300 animate-pulse'
+              }`}
+            >
+              <Trophy className={`w-3.5 h-3.5 ${hasLotterySession ? 'text-amber-400' : 'text-slate-950'}`} />
+              <span>{hasLotterySession ? 'لیست قرعه‌کشی‌ها' : 'تعریف قرعه‌کشی جدید'}</span>
+              {hasLotterySession && activeSessionMaxWinners && (
+                <span className="text-[10px] bg-amber-500/30 px-1.5 py-0.2 rounded font-mono text-white">
+                  {winners.length}/{activeSessionMaxWinners}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Current Winner Rank Badge (only when lottery session is active) */}
+          {hasLotterySession && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-amber-400/40 text-xs font-bold text-amber-300 shadow-sm">
+              <Award className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-amber-200">نوبت:</span>
+              <span className="text-white font-black">{currentRankTitle}</span>
+            </div>
+          )}
 
           {/* Active Participants Badge */}
           <button
-            onClick={onOpenExcelModal}
+            onClick={onOpenSessionsModal}
             disabled={isSpinning}
-            title="مشاهده و مدیریت فایل اکسل افراد"
+            title="مشاهده شرکت‌کنندگان این دوره و بایگانی قرعه‌کشی‌ها"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-700 text-xs font-medium text-slate-200 transition cursor-pointer"
           >
             <Users className="w-3.5 h-3.5 text-amber-400" />
@@ -115,46 +158,42 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
             title="مشاهده فهرست برندگان"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-medium text-amber-300 transition cursor-pointer"
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <Award className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden md:inline">برندگان:</span>
             <span className="font-bold text-white font-mono">{winners.length.toLocaleString('fa-IR')}</span>
           </button>
 
-          {/* Reset Draw Session button */}
-          <button
-            onClick={onResetSession}
-            disabled={isSpinning}
-            title="شروع مجدد قرعه‌کشی از برنده اول"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-red-950/40 text-slate-400 hover:text-red-300 border border-slate-700 hover:border-red-500/40 text-xs transition cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">شروع مجدد (از برنده اول)</span>
-          </button>
+          {/* Finish Lottery Button */}
+          {onFinishSession && winners.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm(`آیا تمایل دارید قرعه‌کشی «${activeSessionTitle || 'جاری'}» با انتخاب ${winners.length} برنده خاتمه یابد و بایگانی شود؟`)) {
+                  onFinishSession();
+                }
+              }}
+              disabled={isSpinning}
+              title="پایان دادن به این قرعه‌کشی و ثبت نهایی برندگان در بایگانی"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-500 border border-red-400/50 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-red-600/20"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>پایان قرعه‌کشی</span>
+            </button>
+          )}
         </div>
 
         {/* Right: Quick Action Controls */}
         <div className="flex items-center gap-1.5">
-          {/* Prize Title Display (configured via settings) */}
-          <div
-            className="px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300 text-xs flex items-center gap-1.5 select-none"
-            title="عنوان جایزه (تنظیم از بخش تنظیمات)"
-          >
-            <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="hidden md:inline text-slate-400">جایزه:</span>
-            <span className="truncate max-w-[130px] font-bold text-white">{settings.prizeTitle}</span>
-          </div>
-
-          {/* Excel Modal Trigger - Prominent button */}
-          <button
-            id="btn-open-excel-modal"
-            onClick={onOpenExcelModal}
-            disabled={isSpinning}
-            title="بارگذاری فایل اکسل اختصاصی"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 text-emerald-300 hover:text-white transition cursor-pointer shadow-sm shadow-emerald-950/50 text-xs font-bold"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">بارگذاری اکسل</span>
-          </button>
+          {/* Prize Title Display (only shown if configured and not empty) */}
+          {settings.prizeTitle && settings.prizeTitle.trim() !== '' && (
+            <div
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300 text-xs flex items-center gap-1.5 select-none"
+              title="عنوان جایزه (تنظیم از بخش تنظیمات)"
+            >
+              <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden md:inline text-slate-400">جایزه:</span>
+              <span className="truncate max-w-[130px] font-bold text-white">{settings.prizeTitle}</span>
+            </div>
+          )}
 
           {/* Privacy Mobile Mask Toggle */}
           <button
@@ -177,6 +216,17 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
               <VolumeX className="w-4 h-4 text-slate-500" />
             )}
           </button>
+
+          {/* Settings & Algorithm Explanation Modal */}
+          {onOpenBgModal && (
+            <button
+              onClick={onOpenBgModal}
+              title="تنظیمات سامانه و مشاهده الگوریتم قرعه‌کشی"
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Fullscreen Button for Projectors / Stage */}
           <button

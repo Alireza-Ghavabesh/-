@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Participant } from '../types';
+import { Participant, Winner } from '../types';
 import { sound } from '../utils/audio';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
-import { Play, Sparkles, Volume2, VolumeX, Shuffle, Eye, EyeOff } from 'lucide-react';
+import { pickSecureWinner } from '../utils/lotteryAlgorithm';
+import { Play, Volume2, VolumeX, Shuffle, Eye, EyeOff, CheckCircle2, Trophy, AlertTriangle, ShieldCheck, Award } from 'lucide-react';
 
 interface LuckyWheelProps {
   participants: Participant[];
   currentWinnerRank: number; // 1 for برنده اول, 2 for برنده دوم, ...
+  lastWinner?: Winner | null;
+  pendingWinner?: Participant | null;
   isSpinning: boolean;
   onSpinStart: () => void;
   onSpinEnd: (winner: Participant) => void;
@@ -16,6 +19,11 @@ interface LuckyWheelProps {
   loanAmount?: string;
   useSettingsLoanAmount?: boolean;
   disabled?: boolean;
+  maxWinnersCount?: number;
+  currentWinnersCount?: number;
+  lotteryTitle?: string;
+  onFinishLottery?: () => void;
+  onOpenSettings?: () => void;
 }
 
 // Visual wheel slice colors - high contrast, luxury stage palette
@@ -39,6 +47,8 @@ const NUM_VISUAL_SLICES = 24; // Optimal slice count for aesthetic wheel clarity
 export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   participants,
   currentWinnerRank,
+  lastWinner,
+  pendingWinner,
   isSpinning,
   onSpinStart,
   onSpinEnd,
@@ -48,13 +58,68 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   loanAmount,
   useSettingsLoanAmount = true,
   disabled = false,
+  maxWinnersCount,
+  currentWinnersCount = 0,
+  lotteryTitle,
+  onFinishLottery,
+  onOpenSettings,
 }) => {
   const [rotation, setRotation] = useState(0);
   const [rollerParticipant, setRollerParticipant] = useState<Participant | null>(null);
   const [pointerBounce, setPointerBounce] = useState(false);
   const [revealStage, setRevealStage] = useState<'idle' | 'spinning' | 'tension' | 'landed'>('idle');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Reset stage to idle once spin and modal are resolved
+  useEffect(() => {
+    if (!isSpinning && !pendingWinner) {
+      setRevealStage('idle');
+    }
+  }, [isSpinning, pendingWinner]);
+
+  // Monitor fullscreen changes dynamically
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    handleFullscreenChange();
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const isCapacityReached = maxWinnersCount !== undefined && maxWinnersCount > 0 && currentWinnersCount >= maxWinnersCount;
+  const isSpinDisabled = disabled || isCapacityReached || participants.length === 0;
 
   const winnerRankTitle = getWinnerOrdinalTitle(currentWinnerRank);
+
+  // Determine who should be displayed in the dynamic box and what subtitle should be shown
+  const displayedPerson: Participant | Winner | null = isSpinning
+    ? rollerParticipant
+    : (revealStage === 'landed' && rollerParticipant)
+    ? rollerParticipant
+    : pendingWinner
+    ? pendingWinner
+    : lastWinner || null;
+
+  const getSubtitle = () => {
+    if (isSpinning) {
+      return revealStage === 'tension'
+        ? `در حال توقف و انتخاب ${winnerRankTitle}...`
+        : `در حال قرعه‌کشی و انتخاب ${winnerRankTitle}...`;
+    }
+    if (revealStage === 'landed' || pendingWinner) {
+      return `🏆 ${winnerRankTitle} مشخص شد:`;
+    }
+    if (lastWinner) {
+      const lastRank = lastWinner.drawRound ? getWinnerOrdinalTitle(lastWinner.drawRound) : (lastWinner.winnerRankTitle || 'برنده قبلی');
+      return `🏆 آخرین برنده انتخاب‌شده (${lastRank}):`;
+    }
+    return 'آماده برای قرعه‌کشی:';
+  };
+
+  const displayedSubtitle = getSubtitle();
 
   const animationFrameRef = useRef<number | null>(null);
   const spinStartTimeRef = useRef<number | null>(null);
@@ -75,28 +140,13 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
     return sample;
   }, [participants]);
 
-  // Handle keyboard spacebar / enter to trigger draw easily for stage presenter
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.code === 'Space' || e.code === 'Enter') && !isSpinning && !disabled && participants.length > 0) {
-        // Prevent accidental space scroll
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          return;
-        }
-        e.preventDefault();
-        startSpin();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSpinning, disabled, participants.length]);
-
   const startSpin = () => {
-    if (isSpinning || participants.length === 0 || disabled) return;
+    if (isSpinning || isSpinDisabled || participants.length === 0) return;
 
-    // Pick fair random winner from active pool
-    const winnerIndex = Math.floor(Math.random() * participants.length);
-    const selectedWinner = participants[winnerIndex];
+    // Pick fair random winner using Cryptographic Fisher-Yates Shuffle & CSPRNG
+    // Step 1: Pre-shuffle the entire candidate pool
+    // Step 2: Select winner using hardware cryptographic randomness (crypto.getRandomValues)
+    const { winner: selectedWinner, shuffledPool } = pickSecureWinner(participants);
     chosenWinnerRef.current = selectedWinner;
 
     onSpinStart();
@@ -112,12 +162,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
     spinStartTimeRef.current = performance.now();
     lastTickAngleRef.current = rotation;
 
-    // Rapid roller through candidate names in center display
+    // Rapid roller cycling through shuffled pool participants in center display
     if (rollerIntervalRef.current) clearInterval(rollerIntervalRef.current);
     let rollerSpeedMs = 40;
     const updateRoller = () => {
-      if (participants.length > 0) {
-        const randP = participants[Math.floor(Math.random() * participants.length)];
+      if (shuffledPool.length > 0) {
+        const randP = shuffledPool[Math.floor(Math.random() * shuffledPool.length)];
         setRollerParticipant(randP);
       }
     };
@@ -205,23 +255,33 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-4 py-3">
+    <div className={`relative flex flex-col items-center justify-center w-full mx-auto px-4 py-3 transition-all duration-300 ${
+      isFullscreen ? 'max-w-7xl' : 'max-w-6xl'
+    }`}>
       {/* Current Prize Banner */}
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-linear-to-r from-amber-500/20 via-yellow-400/30 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10 backdrop-blur-md">
-          <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-          <span className="text-amber-200 text-sm font-medium">در حال قرعه‌کشی:</span>
-          <span className="text-amber-300 text-base md:text-lg font-black tracking-wide">{winnerRankTitle}</span>
+        <div className={`inline-flex items-center gap-2 rounded-full bg-linear-to-r from-amber-500/20 via-yellow-400/30 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10 backdrop-blur-md transition-all ${
+          isFullscreen ? 'px-8 py-2.5 text-lg' : 'px-5 py-2 text-sm'
+        }`}>
+          <Award className={`text-amber-300 ${isFullscreen ? 'w-6 h-6' : 'w-5 h-5'}`} />
+          <span className="text-amber-200 font-medium">در حال قرعه‌کشی:</span>
+          <span className={`text-amber-300 font-black tracking-wide ${isFullscreen ? 'text-xl md:text-2xl' : 'text-base md:text-lg'}`}>
+            {winnerRankTitle}
+          </span>
           {prizeTitle && prizeTitle !== winnerRankTitle && (
-            <span className="text-white text-sm md:text-base font-medium">({prizeTitle})</span>
+            <span className={`text-white font-medium ${isFullscreen ? 'text-base md:text-lg' : 'text-sm md:text-base'}`}>
+              ({prizeTitle})
+            </span>
           )}
         </div>
       </div>
 
       {/* Main Wheel & Showcase Area */}
-      <div className="relative flex flex-col lg:flex-row items-center justify-center gap-8 w-full">
+      <div className={`relative flex flex-col lg:flex-row items-center justify-center w-full transition-all duration-300 ${
+        isFullscreen ? 'gap-10 xl:gap-14' : 'gap-8'
+      }`}>
         {/* Left/Center: The Grand Physical Wheel */}
-        <div className="relative flex items-center justify-center">
+        <div className="relative flex items-center justify-center shrink-0">
           {/* Glowing Ambient Aura */}
           <div
             className={`absolute -inset-6 rounded-full blur-2xl transition-all duration-700 pointer-events-none ${
@@ -245,7 +305,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                     style={{ transform: `rotate(${angle}deg)` }}
                   >
                     <span
-                      className={`w-2 h-2 rounded-full mt-1.5 transition-all duration-300 ${
+                      className={`w-2.5 h-2.5 rounded-full mt-1.5 transition-all duration-300 ${
                         isSpinning
                           ? isEven
                             ? 'bg-yellow-100 shadow-[0_0_8px_#fef08a]'
@@ -260,22 +320,26 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
 
             {/* Pointer / Ticker Arrow at the Top */}
             <div
-              className={`absolute -top-6 left-1/2 -translate-x-1/2 z-30 transition-transform duration-75 origin-top ${
+              className={`absolute -top-7 left-1/2 -translate-x-1/2 z-30 transition-transform duration-75 origin-top ${
                 pointerBounce ? '-rotate-12 scale-110' : 'rotate-0 scale-100'
               }`}
             >
               <div className="relative flex flex-col items-center drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)]">
                 {/* Pointer jewel */}
-                <div className="w-7 h-7 rounded-full bg-linear-to-b from-amber-100 via-amber-400 to-amber-700 border-2 border-white flex items-center justify-center shadow-lg">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                <div className="w-8 h-8 rounded-full bg-linear-to-b from-amber-100 via-amber-400 to-amber-700 border-2 border-white flex items-center justify-center shadow-lg">
+                  <div className="w-3 h-3 rounded-full bg-red-600 animate-ping" />
                 </div>
                 {/* Downward triangle arrow */}
-                <div className="w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[28px] border-t-amber-400 -mt-1" />
+                <div className="w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[32px] border-t-amber-400 -mt-1" />
               </div>
             </div>
 
-            {/* Rotating SVG Wheel */}
-            <div className="relative w-72 h-72 sm:w-96 sm:h-96 md:w-[420px] md:h-[420px] rounded-full overflow-hidden bg-slate-950 shadow-inner">
+            {/* Rotating SVG Wheel with enhanced responsive sizing */}
+            <div className={`relative rounded-full overflow-hidden bg-slate-950 shadow-inner transition-all duration-300 ${
+              isFullscreen
+                ? 'w-80 h-80 sm:w-[420px] sm:h-[420px] md:w-[480px] md:h-[480px] lg:w-[540px] lg:h-[540px] xl:w-[580px] xl:h-[580px]'
+                : 'w-72 h-72 sm:w-96 sm:h-96 md:w-[440px] md:h-[440px] lg:w-[460px] lg:h-[460px]'
+            }`}>
               <svg
                 viewBox="0 0 500 500"
                 className="w-full h-full will-change-transform"
@@ -351,7 +415,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
               {/* Wheel Center Crown / Pivot Hub */}
               <div className="absolute inset-0 m-auto w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-linear-to-b from-amber-200 via-amber-500 to-amber-900 border-4 border-amber-300 shadow-[0_0_30px_rgba(0,0,0,0.9)] flex items-center justify-center z-10">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-950/90 border border-amber-400/60 flex flex-col items-center justify-center text-center p-1">
-                  <Sparkles className="w-5 h-5 text-amber-300 animate-spin" style={{ animationDuration: '8s' }} />
+                  <Trophy className="w-5 h-5 text-amber-300" />
                   <span className="text-[10px] sm:text-xs font-black text-amber-300 mt-0.5">
                     قرعه‌کشی
                   </span>
@@ -362,100 +426,169 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
         </div>
 
         {/* Right/Side: Live Stage Roller & Real-Time Participant Showcase */}
-        <div className="flex flex-col items-center lg:items-stretch w-full max-w-md">
+        <div className={`flex flex-col items-center lg:items-stretch w-full transition-all duration-300 ${
+          isFullscreen ? 'max-w-xl xl:max-w-2xl' : 'max-w-md'
+        }`}>
           {/* Stage Digital Hologram Box */}
-          <div className="w-full bg-slate-900/80 backdrop-blur-xl border-2 border-amber-400/40 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col items-center text-center">
+          <div className={`w-full bg-slate-900/85 backdrop-blur-xl border-2 border-amber-400/40 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col items-center text-center transition-all duration-300 ${
+            isFullscreen ? 'p-8 sm:p-9' : 'p-6'
+          }`}>
             {/* Top Status Header */}
-            <div className="flex items-center justify-between w-full border-b border-white/10 pb-3 mb-4">
-              <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                وضعیت: {isSpinning ? `در حال چرخش و اسکن برای ${winnerRankTitle}...` : `آماده برای انتخاب ${winnerRankTitle}`}
-              </span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
-                {participants.length} نفر باقی‌مانده
-              </span>
+            <div className="flex flex-col gap-2 w-full border-b border-white/10 pb-3 mb-4">
+              <div className="flex items-center justify-between w-full">
+                <span className={`font-bold text-amber-400 flex items-center gap-1.5 ${
+                  isFullscreen ? 'text-sm' : 'text-xs'
+                }`}>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                  وضعیت: {isSpinning ? `در حال چرخش و اسکن برای ${winnerRankTitle}...` : `آماده برای انتخاب ${winnerRankTitle}`}
+                </span>
+                <span className={`font-mono text-slate-400 bg-slate-800/80 rounded-full border border-slate-700 ${
+                  isFullscreen ? 'text-xs px-3.5 py-1.5' : 'text-xs px-2.5 py-1'
+                }`}>
+                  {participants.length} نفر در صف
+                </span>
+              </div>
+              {maxWinnersCount !== undefined && maxWinnersCount > 0 && (
+                <div className={`flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-1.5 text-amber-300 ${
+                  isFullscreen ? 'text-xs' : 'text-[11px]'
+                }`}>
+                  <span className="flex items-center gap-1 font-bold">
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                    <span>پیشرفت قرعه‌کشی:</span>
+                  </span>
+                  <span className="font-mono font-bold">
+                    انتخاب شده: {currentWinnersCount.toLocaleString('fa-IR')} از {maxWinnersCount.toLocaleString('fa-IR')} نفر
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Dynamic Rolling Display Window */}
-            <div className="w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-5 my-2 min-h-[160px] flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
+            <div className={`w-full bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl px-6 py-4 my-2 flex flex-col items-center justify-center relative overflow-hidden shadow-inner select-none ${
+              isFullscreen ? 'h-[270px] xl:h-[290px]' : 'h-[210px]'
+            }`}>
               {/* Scanline / Stage Beam Effect */}
               <div className="absolute inset-0 bg-linear-to-b from-transparent via-amber-400/10 to-transparent pointer-events-none opacity-50" />
 
-              {rollerParticipant ? (
-                <div className="flex flex-col items-center gap-2 z-10 w-full animate-fadeIn">
-                  <span className="text-xs font-bold text-amber-400/90 tracking-wider">
-                    {revealStage === 'landed' ? `🏆 ${winnerRankTitle} مشخص شد:` : 'کاندیدای فعال:'}
-                  </span>
-                  <div className="text-2xl sm:text-3xl font-black text-white drop-shadow-md truncate max-w-full px-2">
-                    {rollerParticipant.fullName}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-                    <span className="text-xs text-amber-200 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/40 font-mono">
-                      کد پرسنلی: {rollerParticipant.personnelCode}
-                    </span>
-                    <span className="text-xs text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">
-                      تلفن: {formatMobile(rollerParticipant.mobile)}
+              {displayedPerson ? (
+                <div className="flex flex-col items-center justify-center z-10 w-full px-2 h-full">
+                  {/* Status subtitle with fixed height */}
+                  <div className="h-6 flex items-center justify-center shrink-0 mb-1">
+                    <span className={`font-bold text-amber-400/90 tracking-wider ${
+                      isFullscreen ? 'text-sm sm:text-base' : 'text-xs'
+                    }`}>
+                      {displayedSubtitle}
                     </span>
                   </div>
-                  {(() => {
-                    const effectiveAmount = (useSettingsLoanAmount || !rollerParticipant.creditDeferred)
-                      ? (loanAmount || rollerParticipant.creditDeferred)
-                      : rollerParticipant.creditDeferred;
-                    if (!effectiveAmount) return null;
-                    return (
-                      <div className="text-xs font-bold text-amber-300 mt-1 flex items-center gap-1.5 font-mono bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/40">
-                        <span className="text-amber-400 text-[11px] font-sans font-medium">وام:</span>
-                        <span>{formatLoanAmount(effectiveAmount).numeric}</span>
-                      </div>
-                    );
-                  })()}
+
+                  {/* Name display container with generous height, vertical padding and relaxed line-height so descenders (ی، ر، ز، ن) are never cut */}
+                  <div className={`flex items-center justify-center w-full shrink-0 overflow-visible py-2 ${
+                    isFullscreen ? 'h-24 sm:h-28' : 'h-18 sm:h-20'
+                  }`}>
+                    <span
+                      title={displayedPerson.fullName}
+                      className={`font-black text-transparent bg-clip-text bg-linear-to-r from-amber-100 via-amber-300 to-yellow-200 drop-shadow-[0_4px_16px_rgba(251,191,36,0.45)] whitespace-nowrap text-ellipsis max-w-full text-center px-3 py-1.5 leading-normal ${
+                        isFullscreen
+                          ? 'text-3xl sm:text-5xl md:text-6xl tracking-wide'
+                          : 'text-2xl sm:text-3xl md:text-4xl'
+                      }`}
+                    >
+                      {displayedPerson.fullName}
+                    </span>
+                  </div>
+
+                  {/* Badges container with fixed height */}
+                  <div className="h-8 flex flex-wrap items-center justify-center gap-2 mt-1 shrink-0">
+                    <span className={`text-amber-300 bg-amber-500/25 px-3 py-0.5 rounded-full border border-amber-400/60 font-bold font-mono whitespace-nowrap ${
+                      isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+                    }`}>
+                      ردیف اکسل: {displayedPerson.rowNumber}
+                    </span>
+                    <span className={`text-amber-200 bg-slate-800 px-3 py-0.5 rounded-full border border-slate-700 font-mono whitespace-nowrap ${
+                      isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+                    }`}>
+                      کد پرسنلی: {displayedPerson.personnelCode}
+                    </span>
+                  </div>
+
+                  {/* Loan Amount badge with fixed height slot to prevent layout jumps */}
+                  <div className="h-7 flex items-center justify-center mt-1 shrink-0">
+                    {(() => {
+                      const effectiveAmount = (useSettingsLoanAmount || !displayedPerson.creditDeferred)
+                        ? (loanAmount || displayedPerson.creditDeferred)
+                        : displayedPerson.creditDeferred;
+                      if (!effectiveAmount) return null;
+                      return (
+                        <div className={`font-bold text-amber-300 flex items-center gap-1.5 font-mono bg-amber-950/40 rounded-full border border-amber-500/40 whitespace-nowrap ${
+                          isFullscreen ? 'text-xs sm:text-sm px-3.5 py-0.5' : 'text-[11px] px-2.5 py-0.5'
+                        }`}>
+                          <span className="text-amber-400 font-sans font-medium text-[10px]">وام:</span>
+                          <span>{formatLoanAmount(effectiveAmount).numeric}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
-                  <Shuffle className="w-8 h-8 text-amber-400/60 animate-bounce" />
-                  <span className="text-sm font-medium">برای شروع دکمه زیر یا کلید اسپیس (Space) را بفشارید</span>
+                <div className="flex flex-col items-center justify-center text-slate-400 gap-3 py-4 h-full">
+                  <Shuffle className={`text-amber-400/60 animate-bounce ${isFullscreen ? 'w-10 h-10' : 'w-8 h-8'}`} />
+                  <span className={`font-medium ${isFullscreen ? 'text-base text-slate-300' : 'text-sm'}`}>
+                    برای شروع قرعه‌کشی {winnerRankTitle}، دکمه زیر را کلیک کنید
+                  </span>
                 </div>
               )}
             </div>
 
             {/* Large Stage Spin Action Button */}
-            <div className="w-full mt-4">
-              <button
-                id="btn-spin-wheel"
-                onClick={startSpin}
-                disabled={isSpinning || participants.length === 0 || disabled}
-                className={`w-full py-4 px-6 rounded-2xl font-black text-lg md:text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl cursor-pointer select-none ${
-                  isSpinning
-                    ? 'bg-slate-800 text-amber-400 border border-amber-500/30 cursor-not-allowed opacity-80'
-                    : participants.length === 0
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                    : 'bg-linear-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 hover:scale-[1.02] active:scale-[0.98] shadow-amber-500/30 hover:shadow-amber-500/50'
-                }`}
-              >
-                {isSpinning ? (
-                  <>
-                    <Sparkles className="w-6 h-6 animate-spin text-amber-400" />
-                    <span>در حال انتخاب {winnerRankTitle}...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-6 h-6 fill-current text-slate-950" />
-                    <span>شروع قرعه‌کشی {winnerRankTitle}</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Quick Keyboard shortcut info */}
-            <div className="mt-3 text-[11px] text-slate-400 flex items-center justify-center gap-2">
-              <span>کلید میانبر:</span>
-              <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[10px]">
-                Space
-              </kbd>
-              <span>یا</span>
-              <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[10px]">
-                Enter
-              </kbd>
+            <div className="w-full mt-5 space-y-2.5">
+              {isCapacityReached ? (
+                /* Capacity Reached Banner & Finish Button */
+                <div className="bg-amber-950/80 border-2 border-amber-500 rounded-2xl p-4 text-center flex flex-col items-center gap-3 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                    <Trophy className="w-5 h-5 text-amber-400 animate-bounce" />
+                    <span>سقف ظرفیت قرعه‌کشی تکمیل شد ({maxWinnersCount} برنده)</span>
+                  </div>
+                  <p className="text-xs text-amber-200/90 leading-relaxed">
+                    تمامی {maxWinnersCount} برنده مورد نظر برای این قرعه‌کشی با موفقیت انتخاب شدند. می‌توانید قرعه‌کشی را نهایی و ثبت نمایید.
+                  </p>
+                  {onFinishLottery && (
+                    <button
+                      onClick={onFinishLottery}
+                      className="w-full py-4 px-6 rounded-xl font-black text-sm sm:text-base bg-linear-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 cursor-pointer transition hover:scale-[1.02]"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>پایان قرعه‌کشی و بایگانی دائمی نتایج</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  id="btn-spin-wheel"
+                  onClick={startSpin}
+                  disabled={isSpinning || isSpinDisabled}
+                  className={`w-full rounded-2xl font-black flex items-center justify-center gap-3 transition-all duration-300 shadow-xl cursor-pointer select-none ${
+                    isFullscreen ? 'py-5 px-8 text-xl sm:text-2xl' : 'py-4 px-6 text-lg md:text-xl'
+                  } ${
+                    isSpinning
+                      ? 'bg-slate-800 text-amber-400 border border-amber-500/30 cursor-not-allowed opacity-80'
+                      : participants.length === 0
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                      : 'bg-linear-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 hover:scale-[1.02] active:scale-[0.98] shadow-amber-500/30 hover:shadow-amber-500/50'
+                  }`}
+                >
+                  {isSpinning ? (
+                    <>
+                      <Shuffle className="w-6 h-6 animate-spin text-amber-400" />
+                      <span>در حال انتخاب {winnerRankTitle}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-6 h-6 fill-current text-slate-950" />
+                      <span>شروع قرعه‌کشی {winnerRankTitle}</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

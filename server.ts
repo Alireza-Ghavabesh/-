@@ -88,7 +88,34 @@ async function initDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS lottery_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      date TEXT,
+      loan_amount TEXT,
+      max_winners_count INTEGER,
+      status TEXT,
+      total_participants_count INTEGER,
+      winners_json TEXT,
+      participants_json TEXT,
+      excel_file_name TEXT,
+      created_at TEXT,
+      completed_at TEXT
+    );
   `);
+
+  // Migrate existing databases if columns do not exist
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN participants_json TEXT');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN excel_file_name TEXT');
+  } catch {
+    // column already exists
+  }
 
   saveDb();
 }
@@ -376,6 +403,100 @@ async function startServer() {
         }
         saveDb();
       }
+      res.json({ success: true });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // --- Lottery Sessions Endpoints ---
+
+  // Get all lottery sessions
+  app.get('/api/lottery-sessions', (req, res) => {
+    try {
+      const rows = queryAll('SELECT * FROM lottery_sessions ORDER BY created_at DESC');
+      const sessions = rows.map((r) => {
+        let winners = [];
+        try {
+          if (r.winners_json) {
+            winners = JSON.parse(String(r.winners_json));
+          }
+        } catch {
+          winners = [];
+        }
+
+        let participants = [];
+        try {
+          if (r.participants_json) {
+            participants = JSON.parse(String(r.participants_json));
+          }
+        } catch {
+          participants = [];
+        }
+
+        return {
+          id: String(r.id),
+          title: String(r.title || ''),
+          date: String(r.date || ''),
+          loanAmount: String(r.loan_amount || ''),
+          maxWinnersCount: Number(r.max_winners_count || 0),
+          status: String(r.status || 'active'),
+          totalParticipantsCount: Number(r.total_participants_count || (participants.length > 0 ? participants.length : 0)),
+          winners,
+          participants,
+          excelFileName: r.excel_file_name ? String(r.excel_file_name) : undefined,
+          createdAt: String(r.created_at || ''),
+          completedAt: r.completed_at ? String(r.completed_at) : undefined,
+        };
+      });
+      res.json({ success: true, sessions });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // Create or update a lottery session
+  app.post('/api/lottery-sessions', (req, res) => {
+    try {
+      const session = req.body;
+      if (!session || !session.id || !session.title) {
+        res.status(400).json({ success: false, error: 'اطلاعات قرعه‌کشی ناقص است' });
+        return;
+      }
+
+      db.run(
+        `INSERT OR REPLACE INTO lottery_sessions 
+        (id, title, date, loan_amount, max_winners_count, status, total_participants_count, winners_json, participants_json, excel_file_name, created_at, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          String(session.id),
+          String(session.title || ''),
+          String(session.date || ''),
+          String(session.loanAmount || ''),
+          Number(session.maxWinnersCount || 0),
+          String(session.status || 'active'),
+          Number(session.totalParticipantsCount || (Array.isArray(session.participants) ? session.participants.length : 0)),
+          JSON.stringify(session.winners || []),
+          JSON.stringify(session.participants || []),
+          session.excelFileName ? String(session.excelFileName) : null,
+          String(session.createdAt || new Date().toISOString()),
+          session.completedAt ? String(session.completedAt) : null,
+        ]
+      );
+
+      saveDb();
+      res.json({ success: true, session });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // Delete a lottery session
+  app.delete('/api/lottery-sessions/:id', (req, res) => {
+    try {
+      const id = req.params.id;
+      db.run('DELETE FROM lottery_sessions WHERE id = ?', [id]);
+      saveDb();
       res.json({ success: true });
     } catch (err: unknown) {
       res.status(500).json({ success: false, error: String(err) });

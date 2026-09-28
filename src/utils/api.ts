@@ -1,8 +1,46 @@
-import { Winner, Participant, CustomBackground } from '../types';
+import { Winner, Participant, CustomBackground, LotterySession } from '../types';
 
 /**
  * API helper to interact with server-side SQLite endpoints
  */
+
+export async function fetchLotterySessionsFromDb(): Promise<LotterySession[]> {
+  try {
+    const res = await fetch('/api/lottery-sessions');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.sessions || [];
+  } catch (e) {
+    console.warn('Could not fetch lottery sessions:', e);
+    return [];
+  }
+}
+
+export async function saveLotterySessionToDb(session: LotterySession): Promise<boolean> {
+  try {
+    const res = await fetch('/api/lottery-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('Could not save lottery session:', e);
+    return false;
+  }
+}
+
+export async function deleteLotterySessionFromDb(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/lottery-sessions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('Could not delete lottery session:', e);
+    return false;
+  }
+}
 
 export async function fetchWinnersFromDb(): Promise<Winner[] | null> {
   try {
