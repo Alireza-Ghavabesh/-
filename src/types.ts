@@ -54,6 +54,32 @@ export interface ExcelParseReport {
 
 export type ThemePreset = 'royal-gold' | 'midnight-stage' | 'emerald-gala' | 'neon-festive';
 
+export interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  isSuperAdmin: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AuthorizedDevice {
+  id: string;
+  deviceFingerprint: string;
+  deviceName: string;
+  details?: Record<string, unknown>;
+  isPrimary: boolean;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+export interface MachineStatus {
+  isAuthorized: boolean;
+  totalAuthorizedDevices: number;
+  primaryDeviceName?: string | null;
+  currentFingerprint: string;
+}
+
 export interface AppSettings {
   lotteryTitle: string; // عنوان قرعه‌کشی (متن بالای صفحه)
   prizeTitle: string; // عنوان جایزه

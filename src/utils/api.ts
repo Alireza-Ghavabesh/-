@@ -1,8 +1,294 @@
-import { Winner, Participant, CustomBackground, LotterySession } from '../types';
+import { Winner, Participant, CustomBackground, LotterySession, AdminUser, AuthorizedDevice, MachineStatus } from '../types';
+import { getDeviceFingerprint, getDeviceDetails } from './deviceFingerprint';
 
 /**
- * API helper to interact with server-side SQLite endpoints
+ * API helper to interact with server-side SQLite endpoints, JWT Authentication, and Hardware Machine Lock
  */
+
+let cachedDeviceFp = '';
+// Pre-calculate device fingerprint asynchronously
+getDeviceFingerprint().then((fp) => {
+  cachedDeviceFp = fp;
+});
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem('lottery_admin_jwt');
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null) {
+  try {
+    if (token) {
+      localStorage.setItem('lottery_admin_jwt', token);
+    } else {
+      localStorage.removeItem('lottery_admin_jwt');
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function getAuthHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = getStoredToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (cachedDeviceFp) {
+    headers['X-Device-Fingerprint'] = cachedDeviceFp;
+  }
+  return headers;
+}
+
+// --- Authentication & Hardware Lock APIs ---
+
+export async function loginAdmin(
+  username: string,
+  password: string
+): Promise<{ success: boolean; user?: AdminUser; error?: string; code?: string }> {
+  try {
+    const deviceFingerprint = await getDeviceFingerprint();
+    cachedDeviceFp = deviceFingerprint;
+    const deviceDetails = getDeviceDetails();
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Fingerprint': deviceFingerprint,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ username, password, deviceFingerprint, deviceDetails }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (data.token) {
+        setStoredToken(data.token);
+      }
+      return { success: true, user: data.user };
+    }
+    return { success: false, error: data.error || 'خطا در ورود به سیستم', code: data.code };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function checkAuthMe(): Promise<AdminUser | null> {
+  try {
+    const deviceFingerprint = await getDeviceFingerprint();
+    cachedDeviceFp = deviceFingerprint;
+
+    const res = await fetch('/api/auth/me', {
+      headers: {
+        ...getAuthHeaders(),
+        'X-Device-Fingerprint': deviceFingerprint,
+      },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        setStoredToken(null);
+      }
+      return null;
+    }
+    const data = await res.json();
+    if (data.success && data.user) {
+      return data.user;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function logoutAdmin(): Promise<boolean> {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    setStoredToken(null);
+    return true;
+  } catch {
+    setStoredToken(null);
+    return false;
+  }
+}
+
+export async function fetchMachineStatus(): Promise<MachineStatus | null> {
+  try {
+    const deviceFingerprint = await getDeviceFingerprint();
+    cachedDeviceFp = deviceFingerprint;
+
+    const res = await fetch('/api/auth/machine-status', {
+      headers: {
+        ...getAuthHeaders(),
+        'X-Device-Fingerprint': deviceFingerprint,
+      },
+      credentials: 'include',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.success) {
+      return {
+        isAuthorized: Boolean(data.isAuthorized),
+        totalAuthorizedDevices: Number(data.totalAuthorizedDevices || 0),
+        primaryDeviceName: data.primaryDeviceName,
+        currentFingerprint: data.currentFingerprint || deviceFingerprint,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function authorizeNewMachine(payload: {
+  masterUsername: string;
+  masterPassword: string;
+  deviceName?: string;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const deviceFingerprint = await getDeviceFingerprint();
+    cachedDeviceFp = deviceFingerprint;
+    const deviceDetails = getDeviceDetails();
+
+    const res = await fetch('/api/auth/authorize-machine', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Fingerprint': deviceFingerprint,
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        ...payload,
+        deviceFingerprint,
+        deviceDetails,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, message: data.message };
+    }
+    return { success: false, error: data.error || 'خطا در تایید کامپیوتر' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function fetchAuthorizedDevices(): Promise<AuthorizedDevice[]> {
+  try {
+    const res = await fetch('/api/auth/authorized-devices', {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.devices || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function revokeAuthorizedDevice(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/auth/authorized-devices/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchAdminsList(): Promise<AdminUser[]> {
+  try {
+    const res = await fetch('/api/auth/admins', {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.admins || [];
+  } catch (err) {
+    console.warn('Failed to fetch admins list:', err);
+    return [];
+  }
+}
+
+export async function createAdminUser(payload: {
+  username: string;
+  password: string;
+  name: string;
+  isSuperAdmin: boolean;
+}): Promise<{ success: boolean; admin?: AdminUser; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/admins', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, admin: data.admin };
+    }
+    return { success: false, error: data.error || 'خطا در ایجاد ادمین' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function updateAdminUser(
+  id: string,
+  payload: { username?: string; password?: string; name?: string; isSuperAdmin?: boolean }
+): Promise<{ success: boolean; admin?: AdminUser; error?: string }> {
+  try {
+    const res = await fetch(`/api/auth/admins/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (data.token) {
+        setStoredToken(data.token);
+      }
+      return { success: true, admin: data.admin };
+    }
+    return { success: false, error: data.error || 'خطا در به‌روزرسانی ادمین' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function deleteAdminUser(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/auth/admins/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true };
+    }
+    return { success: false, error: data.error || 'خطا در حذف ادمین' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+// --- SQLite Lottery Data APIs ---
 
 export async function fetchLotterySessionsFromDb(): Promise<LotterySession[]> {
   try {

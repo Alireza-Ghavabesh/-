@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, Winner, AppSettings, LotterySession } from './types';
+import { Participant, Winner, AppSettings, LotterySession, AdminUser } from './types';
 import { getDemoParticipants } from './utils/excel';
 import { getWinnerOrdinalTitle } from './utils/format';
 import { LuckyWheel } from './components/LuckyWheel';
@@ -9,6 +9,8 @@ import { ExcelUploadModal } from './components/ExcelUploadModal';
 import { WinnersListModal } from './components/WinnersListModal';
 import { BackgroundSettingsModal } from './components/BackgroundSettingsModal';
 import { LotterySessionsModal } from './components/LotterySessionsModal';
+import { AdminLoginScreen } from './components/AdminLoginScreen';
+import { AdminManagementModal } from './components/AdminManagementModal';
 import { Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw, Settings, PlusCircle, Plus, Calendar, AlertCircle } from 'lucide-react';
 import {
   saveWinnerToDb,
@@ -22,6 +24,8 @@ import {
   fetchLotterySessionsFromDb,
   saveLotterySessionToDb,
   deleteLotterySessionFromDb,
+  checkAuthMe,
+  logoutAdmin,
 } from './utils/api';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -38,6 +42,23 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
+  // Authentication states
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Check login session on mount
+  useEffect(() => {
+    checkAuthMe()
+      .then((user) => {
+        setCurrentUser(user);
+        setIsAuthChecking(false);
+      })
+      .catch(() => {
+        setIsAuthChecking(false);
+      });
+  }, []);
+
   // Clear any old persisted session state so reload always starts completely fresh
   useEffect(() => {
     try {
@@ -495,6 +516,32 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    if (confirm('آیا از خروج از حساب مدیریت سامانه اطمینان دارید؟')) {
+      await logoutAdmin();
+      setCurrentUser(null);
+    }
+  };
+
+  // If still checking existing cookie / session
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white font-sans" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center animate-pulse mb-4 shadow-xl shadow-amber-500/10">
+          <Trophy className="w-8 h-8 text-amber-400" />
+        </div>
+        <div className="flex items-center gap-2 text-sm text-amber-300 font-bold">
+          <span>در حال اعتبارسنجی نشست مدیر سامانه...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // If not logged in, show Admin Login Screen
+  if (!currentUser) {
+    return <AdminLoginScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <div
       className={`min-h-screen w-full relative flex flex-col justify-between text-slate-100 overflow-x-hidden selection:bg-amber-400 selection:text-slate-950 font-sans ${getThemeBackground()}`}
@@ -543,6 +590,9 @@ export default function App() {
         activeSessionTitle={activeSession?.title}
         activeSessionDate={activeSession?.date}
         activeSessionMaxWinners={activeSession?.maxWinnersCount}
+        currentUser={currentUser}
+        onOpenAdminManagement={() => setIsAdminModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Wheel Stage or Empty State */}
@@ -715,6 +765,16 @@ export default function App() {
         settings={settings}
         onUpdateSettings={updateSettings}
       />
+
+      {/* Admin Management Modal */}
+      {currentUser && (
+        <AdminManagementModal
+          isOpen={isAdminModalOpen}
+          onClose={() => setIsAdminModalOpen(false)}
+          currentUser={currentUser}
+          onCurrentUserUpdated={(updated) => setCurrentUser(updated)}
+        />
+      )}
     </div>
   );
 }
