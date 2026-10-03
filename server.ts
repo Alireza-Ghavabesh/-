@@ -9,7 +9,10 @@ import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import os from 'os';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const isAiStudioCloud = Boolean(process.env.APPLET_ID || process.env.K_SERVICE);
+const PORT = (!isAiStudioCloud && process.env.PORT)
+  ? parseInt(process.env.PORT, 10)
+  : (isAiStudioCloud ? (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000) : 4000);
 const DB_FILE = path.join(process.cwd(), 'lottery.db');
 const JWT_SECRET = process.env.JWT_SECRET || 'lottery_master_ultra_secure_jwt_secret_2026_key_9390acb6';
 
@@ -1102,7 +1105,7 @@ async function startServer() {
     });
   }
 
-  // Primary server listens on PORT (Defaults to 4000)
+  // Primary server listens on PORT
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`====================================================`);
     console.log(` Lottery App running on port ${PORT}`);
@@ -1110,9 +1113,19 @@ async function startServer() {
     console.log(`====================================================`);
   });
 
+  // Ensure port 4000 is also open if PORT is not 4000
+  if (PORT !== 4000) {
+    try {
+      app.listen(4000, '0.0.0.0', () => {
+        console.log(` Also listening on port 4000`);
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
   // NOTE: On your local machine/server, the app runs ONLY on port 4000 (port 3000 is NEVER used).
   // Inside the Google AI Studio online sandbox container only, an internal bridge is kept so the cloud preview works.
-  const isAiStudioCloud = Boolean(process.env.APPLET_ID || process.env.K_SERVICE);
   if (isAiStudioCloud && PORT !== 3000) {
     try {
       app.listen(3000, '0.0.0.0', () => {
