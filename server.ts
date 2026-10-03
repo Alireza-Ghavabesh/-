@@ -1102,34 +1102,24 @@ async function startServer() {
     });
   }
 
-  const PRIMARY_PORT = 4000;
-  app.listen(PRIMARY_PORT, '0.0.0.0', () => {
+  // Primary server listens on PORT (Defaults to 4000)
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`====================================================`);
-    console.log(` Lottery App & SQLite Server running on 0.0.0.0:${PRIMARY_PORT}`);
+    console.log(` Lottery App running on port ${PORT}`);
     console.log(` SQLite Database: ${DB_FILE}`);
     console.log(`====================================================`);
   });
 
-  // Also listen on port 3000 to maintain AI Studio preview compatibility
-  try {
-    app.listen(3000, '0.0.0.0', () => {
-      console.log(` Also listening on port 3000 for preview proxy`);
-    });
-  } catch {
-    // Ignore if already bound
-  }
-
-  // Also listen on process.env.PORT if specified by cloud host
-  if (process.env.PORT) {
-    const envP = parseInt(process.env.PORT, 10);
-    if (envP !== PRIMARY_PORT && envP !== 3000) {
-      try {
-        app.listen(envP, '0.0.0.0', () => {
-          console.log(` Also listening on cloud host port ${envP}`);
-        });
-      } catch {
-        // Ignore
-      }
+  // NOTE: On your local machine/server, the app runs ONLY on port 4000 (port 3000 is NEVER used).
+  // Inside the Google AI Studio online sandbox container only, an internal bridge is kept so the cloud preview works.
+  const isAiStudioCloud = Boolean(process.env.APPLET_ID || process.env.K_SERVICE);
+  if (isAiStudioCloud && PORT !== 3000) {
+    try {
+      app.listen(3000, '0.0.0.0', () => {
+        console.log(`[AI Studio Cloud internal bridge on 3000]`);
+      });
+    } catch {
+      // Ignore
     }
   }
 }
