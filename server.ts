@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import os from 'os';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
 const DB_FILE = path.join(process.cwd(), 'lottery.db');
 const JWT_SECRET = process.env.JWT_SECRET || 'lottery_master_ultra_secure_jwt_secret_2026_key_9390acb6';
 
@@ -1102,12 +1102,36 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const PRIMARY_PORT = 4000;
+  app.listen(PRIMARY_PORT, '0.0.0.0', () => {
     console.log(`====================================================`);
-    console.log(` Lottery App & SQLite Server running on 0.0.0.0:${PORT}`);
+    console.log(` Lottery App & SQLite Server running on 0.0.0.0:${PRIMARY_PORT}`);
     console.log(` SQLite Database: ${DB_FILE}`);
     console.log(`====================================================`);
   });
+
+  // Also listen on port 3000 to maintain AI Studio preview compatibility
+  try {
+    app.listen(3000, '0.0.0.0', () => {
+      console.log(` Also listening on port 3000 for preview proxy`);
+    });
+  } catch {
+    // Ignore if already bound
+  }
+
+  // Also listen on process.env.PORT if specified by cloud host
+  if (process.env.PORT) {
+    const envP = parseInt(process.env.PORT, 10);
+    if (envP !== PRIMARY_PORT && envP !== 3000) {
+      try {
+        app.listen(envP, '0.0.0.0', () => {
+          console.log(` Also listening on cloud host port ${envP}`);
+        });
+      } catch {
+        // Ignore
+      }
+    }
+  }
 }
 
 startServer().catch((err) => {
