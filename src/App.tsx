@@ -11,11 +11,13 @@ import { BackgroundSettingsModal } from './components/BackgroundSettingsModal';
 import { LotterySessionsModal } from './components/LotterySessionsModal';
 import { AdminLoginScreen } from './components/AdminLoginScreen';
 import { AdminManagementModal } from './components/AdminManagementModal';
+import { DatabaseBackupModal } from './components/DatabaseBackupModal';
 import { Trophy, FileSpreadsheet, Image as ImageIcon, Users, RefreshCcw, RotateCcw, Settings, PlusCircle, Plus, Calendar, AlertCircle } from 'lucide-react';
 import {
   saveWinnerToDb,
   deleteWinnerFromDb,
   clearAllWinnersFromDb,
+  fetchWinnersFromDb,
   fetchParticipantsFromDb,
   saveParticipantsToDb,
   fetchBackgroundsFromDb,
@@ -39,6 +41,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   bgImageUrl: null,
   bgDarkness: 30,
   themePreset: 'royal-gold',
+  loginHeaderTitle: 'ورود به پنل مدیریت',
+  loginSubTitle: 'سامانه قرعه‌کشی و اعطای تسهیلات',
+  loginLogoUrl: null,
 };
 
 export default function App() {
@@ -57,16 +62,6 @@ export default function App() {
       .catch(() => {
         setIsAuthChecking(false);
       });
-  }, []);
-
-  // Clear any old persisted session state so reload always starts completely fresh
-  useEffect(() => {
-    try {
-      localStorage.removeItem('lottery_active_participants');
-      localStorage.removeItem('lottery_winners');
-    } catch {
-      // ignore
-    }
   }, []);
 
   // Master participant pool (the baseline list for the active lottery session)
@@ -159,35 +154,34 @@ export default function App() {
             lotteryTitle: dbSettings.lotteryTitle || prev.lotteryTitle,
             prizeTitle,
             loanAmount: dbSettings.loanAmount || prev.loanAmount,
-            useSettingsLoanAmount: dbSettings.useSettingsLoanAmount !== undefined ? (dbSettings.useSettingsLoanAmount === 'true' || dbSettings.useSettingsLoanAmount === '1') : prev.useSettingsLoanAmount,
-            spinDurationSeconds: dbSettings.spinDurationSeconds ? Number(dbSettings.spinDurationSeconds) : prev.spinDurationSeconds,
+            useSettingsLoanAmount:
+              dbSettings.useSettingsLoanAmount !== undefined
+                ? dbSettings.useSettingsLoanAmount === 'true' || dbSettings.useSettingsLoanAmount === '1'
+                : prev.useSettingsLoanAmount,
+            spinDurationSeconds: dbSettings.spinDurationSeconds
+              ? Number(dbSettings.spinDurationSeconds)
+              : prev.spinDurationSeconds,
+            loginHeaderTitle: dbSettings.loginHeaderTitle || prev.loginHeaderTitle,
+            loginSubTitle: dbSettings.loginSubTitle || prev.loginSubTitle,
+            loginLogoUrl: dbSettings.loginLogoUrl !== undefined ? (dbSettings.loginLogoUrl || null) : prev.loginLogoUrl,
+            maskMobile:
+              dbSettings.maskMobile !== undefined
+                ? dbSettings.maskMobile === 'true' || dbSettings.maskMobile === '1'
+                : prev.maskMobile,
+            soundEnabled:
+              dbSettings.soundEnabled !== undefined
+                ? dbSettings.soundEnabled === 'true' || dbSettings.soundEnabled === '1'
+                : prev.soundEnabled,
+            bgDarkness: dbSettings.bgDarkness ? Number(dbSettings.bgDarkness) : prev.bgDarkness,
+            themePreset: (dbSettings.themePreset as any) || prev.themePreset,
           };
         });
       }
     });
   }, []);
 
-  // Settings
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const saved = localStorage.getItem('lottery_settings');
-      const savedBg = localStorage.getItem('lottery_custom_bg');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.prizeTitle === 'جایزه دور اول قرعه‌کشی') {
-          parsed.prizeTitle = '';
-        }
-        return {
-          ...DEFAULT_SETTINGS,
-          ...parsed,
-          bgImageUrl: savedBg || parsed.bgImageUrl || null,
-        };
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_SETTINGS;
-  });
+  // Settings: initialized cleanly with defaults, and populated from SQLite database
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   // State management
   const [isSpinning, setIsSpinning] = useState(false);
@@ -195,30 +189,72 @@ export default function App() {
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [isWinnersModalOpen, setIsWinnersModalOpen] = useState(false);
   const [isBgModalOpen, setIsBgModalOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   // Current winner rank in this session (1 for برنده اول, 2 for برنده دوم, ...)
   const currentWinnerRank = winners.length + 1;
   const currentRankTitle = getWinnerOrdinalTitle(currentWinnerRank);
 
+  // Document Title update
   useEffect(() => {
-    try {
-      if (settings.lotteryTitle) {
-        document.title = settings.lotteryTitle;
-      }
-      const copy = { ...settings };
-      // avoid saving huge base64 in the general settings object
-      if (copy.bgImageUrl && copy.bgImageUrl.length > 500) {
-        copy.bgImageUrl = 'CUSTOM_SAVED';
-      }
-      localStorage.setItem('lottery_settings', JSON.stringify(copy));
-    } catch {
-      // ignore
+    if (settings.lotteryTitle) {
+      document.title = settings.lotteryTitle;
     }
-  }, [settings]);
+  }, [settings.lotteryTitle]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
     saveSettingsToDb(newSettings);
+  };
+
+  // Reload all active records from SQLite into UI after a database restore
+  const handleReloadAllFromDb = async () => {
+    try {
+      const [dbParticipants, dbWinners, dbSessions, dbSettings, bgs] = await Promise.all([
+        fetchParticipantsFromDb(),
+        fetchWinnersFromDb(),
+        fetchLotterySessionsFromDb(),
+        fetchSettingsFromDb(),
+        fetchBackgroundsFromDb(),
+      ]);
+
+      if (dbParticipants) {
+        setParticipants(dbParticipants);
+      }
+      if (dbWinners) {
+        setWinners(dbWinners);
+      }
+      if (dbSessions) {
+        setSessions(dbSessions);
+        const active = dbSessions.find((s) => s.status === 'active');
+        if (active) {
+          setActiveSession(active);
+          if (active.participants && active.participants.length > 0) {
+            setParticipants(active.participants);
+          }
+          if (active.winners) {
+            setWinners(active.winners);
+          }
+        }
+      }
+      if (dbSettings && Object.keys(dbSettings).length > 0) {
+        setSettings((prev) => ({
+          ...prev,
+          lotteryTitle: dbSettings.lotteryTitle ?? prev.lotteryTitle,
+          prizeTitle: dbSettings.prizeTitle ?? prev.prizeTitle,
+          loanAmount: dbSettings.loanAmount ?? prev.loanAmount,
+          themePreset: (dbSettings.themePreset as any) ?? prev.themePreset,
+        }));
+      }
+      if (bgs && bgs.length > 0) {
+        const activeBg = bgs.find((b) => b.isActive) || bgs[0];
+        if (activeBg && activeBg.imageBase64) {
+          setSettings((prev) => ({ ...prev, bgImageUrl: activeBg.imageBase64 }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to reload data after restore:', err);
+    }
   };
 
   const handleSpinStart = () => {
@@ -476,12 +512,6 @@ export default function App() {
       setSessions((prev) => prev.map((s) => (s.id === updatedSession.id ? updatedSession : s)));
       saveLotterySessionToDb(updatedSession);
     }
-
-    try {
-      localStorage.setItem('lottery_master_participants', JSON.stringify(newList));
-    } catch {
-      // ignore
-    }
   };
 
   const handleResetToDemo = () => {
@@ -492,11 +522,6 @@ export default function App() {
       setWinners([]);
       setPendingWinner(null);
       saveParticipantsToDb(demo, true);
-      try {
-        localStorage.setItem('lottery_master_participants', JSON.stringify(demo));
-      } catch {
-        // ignore
-      }
     }
   };
 
@@ -764,6 +789,14 @@ export default function App() {
         onClose={() => setIsBgModalOpen(false)}
         settings={settings}
         onUpdateSettings={updateSettings}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
+      />
+
+      {/* Database Backup & Restore Modal */}
+      <DatabaseBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        onRestoreSuccess={handleReloadAllFromDb}
       />
 
       {/* Admin Management Modal */}

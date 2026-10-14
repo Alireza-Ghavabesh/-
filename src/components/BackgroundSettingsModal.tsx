@@ -21,6 +21,11 @@ import {
   Dice5,
   Lock,
   Binary,
+  Database,
+  LogIn,
+  Trophy,
+  Sparkles,
+  FileCheck,
 } from 'lucide-react';
 import { fetchBackgroundsFromDb, saveBackgroundToDb, activateBackgroundInDb, deleteBackgroundFromDb } from '../utils/api';
 import { formatLoanAmount } from '../utils/format';
@@ -30,6 +35,7 @@ interface BackgroundSettingsModalProps {
   onClose: () => void;
   settings: AppSettings;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => void;
+  onOpenBackupModal?: () => void;
 }
 
 const THEME_OPTIONS: { id: ThemePreset; name: string; gradient: string; desc: string }[] = [
@@ -64,9 +70,11 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
   onClose,
   settings,
   onUpdateSettings,
+  onOpenBackupModal,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'algorithm'>('general');
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'login' | 'backup' | 'algorithm'>('general');
   const [savedBackgrounds, setSavedBackgrounds] = useState<CustomBackground[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -97,23 +105,18 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
       const dataUrl = reader.result as string;
       onUpdateSettings({ bgImageUrl: dataUrl });
 
-      // Save to SQLite database as Base64
+      // Save directly to SQLite database as Base64
       await saveBackgroundToDb({
         name: file.name,
         imageBase64: dataUrl,
         setActive: true,
       });
 
-      // Reload saved backgrounds
+      // Reload saved backgrounds from SQLite
       const bgs = await fetchBackgroundsFromDb();
       if (bgs) setSavedBackgrounds(bgs);
 
       setIsSaving(false);
-      try {
-        localStorage.setItem('lottery_custom_bg', dataUrl);
-      } catch {
-        // ignore storage quota
-      }
     };
     reader.readAsDataURL(file);
   };
@@ -135,26 +138,45 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
   const handleRemoveImage = () => {
     onUpdateSettings({ bgImageUrl: null });
     activateBackgroundInDb('default');
-    try {
-      localStorage.removeItem('lottery_custom_bg');
-    } catch {
-      // ignore
+  };
+
+  // Login Logo Upload Handler
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('لطفاً یک فایل تصویری معتبر برای لوگو انتخاب کنید.');
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // Persist directly to SQLite database
+      onUpdateSettings({ loginLogoUrl: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    // Persist removal to SQLite database
+    onUpdateSettings({ loginLogoUrl: '' });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-2xl bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col overflow-hidden text-right">
-        {/* Header */}
+        {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
               <Settings className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">تنظیمات و شفافیت قرعه‌کشی</h3>
+              <h3 className="text-lg font-bold text-white">تنظیمات سامانه و دیتابیس</h3>
               <p className="text-xs text-slate-400">
-                پیکربندی سامانه، ظاهر گردونه، و سازوکار ریاضی و امنیتی انتخاب برنده
+                شخصی‌سازی صفحه ورود، ظاهر استیج، پشتیبان‌گیری و شفافیت الگوریتم
               </p>
             </div>
           </div>
@@ -167,32 +189,57 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 pt-3 pb-2 border-b border-slate-800 text-xs font-bold">
+        <div className="flex items-center gap-1.5 pt-3 pb-2 border-b border-slate-800 text-xs font-bold overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('general')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
               activeTab === 'general'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
           >
             <Sliders className="w-4 h-4" />
-            <span>تنظیمات عمومی و ظاهر استیج</span>
+            <span>ظاهر استیج و گردونه</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('login')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              activeTab === 'login'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            <span>شخصی‌سازی صفحه لاگین</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('backup')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              activeTab === 'backup'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Database className="w-4 h-4 text-amber-400" />
+            <span>پشتیبان‌گیری دیتابیس</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('algorithm')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer relative ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap relative ${
               activeTab === 'algorithm'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
           >
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>الگوریتم بر زدن و نحوه قرعه‌کشی</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>الگوریتم قرعه‌کشی</span>
           </button>
         </div>
 
@@ -246,21 +293,21 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
               />
             </div>
 
-            {/* 5. Custom Background Image */}
-            <div className="space-y-3">
+            {/* 3. Custom Background Image Upload */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-inner">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-amber-400" />
-                  تصویر پس‌زمینه دلخواه (اختیاری):
+                <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                  <span>تصویر پس‌زمینه اختصاصی استیج:</span>
                 </span>
                 {settings.bgImageUrl && (
                   <button
                     type="button"
                     onClick={handleRemoveImage}
-                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition cursor-pointer"
+                    className="text-xs text-red-400 hover:text-red-300 transition cursor-pointer flex items-center gap-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف عکس و بازگشت به تم پیش‌فرض</span>
+                    <span>حذف تصویر فعلی</span>
                   </button>
                 )}
               </div>
@@ -269,63 +316,113 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                className="hidden"
                 onChange={handleImageUpload}
+                className="hidden"
               />
 
-              {settings.bgImageUrl ? (
-                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 h-36 shadow-lg group">
-                  <img
-                    src={settings.bgImageUrl}
-                    alt="Custom Background"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-amber-400 transition cursor-pointer"
-                    >
-                      تغییر تصویر
-                    </button>
-                  </div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-700 hover:border-amber-400/70 rounded-2xl p-4 text-center cursor-pointer transition bg-slate-900/60 hover:bg-slate-900 flex flex-col items-center justify-center gap-2 group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-110 transition">
+                  <Upload className="w-5 h-5" />
                 </div>
-              ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-700 hover:border-amber-400/60 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-950/40 hover:bg-slate-800/30 transition"
-                >
-                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
-                    <ImageIcon className="w-5 h-5" />
+                <div>
+                  <p className="text-xs font-bold text-slate-200">
+                    {isSaving ? 'در حال ذخیره‌سازی در دیتابیس...' : 'انتخاب تصویر باکیفیت برای پس‌زمینه'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    فرمت‌های JPG، PNG و WebP — مستقیماً در دیتابیس ذخیره می‌شود
+                  </p>
+                </div>
+              </div>
+
+              {/* Saved Backgrounds list */}
+              {savedBackgrounds.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  <div className="text-xs font-bold text-slate-400">تصاویر پس‌زمینه ذخیره‌شده در دیتابیس:</div>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {savedBackgrounds.map((bg) => (
+                      <div
+                        key={bg.id}
+                        onClick={() => handleSelectSavedBg(bg)}
+                        className={`relative rounded-xl overflow-hidden border-2 cursor-pointer group aspect-video ${
+                          settings.bgImageUrl === bg.imageBase64
+                            ? 'border-amber-400 shadow-md shadow-amber-500/20'
+                            : 'border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        <img
+                          src={bg.imageBase64}
+                          alt={bg.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSavedBg(e, bg.id)}
+                          className="absolute top-1 left-1 p-1 bg-black/70 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition"
+                          title="حذف از دیتابیس"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        {settings.bgImageUrl === bg.imageBase64 && (
+                          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 text-[9px] font-black flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" />
+                            <span>فعال</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-xs font-bold text-slate-300">
-                    برای آپلود عکس پس‌زمینه سالن کلیک کنید
-                  </span>
                 </div>
               )}
             </div>
 
-            {/* Theme Presets */}
-            <div className="space-y-3">
-              <span className="text-sm font-bold text-white flex items-center gap-2">
-                <Palette className="w-4 h-4 text-amber-400" />
-                تم‌های استیج و صحنه قرعه‌کشی:
-              </span>
+            {/* 4. Background Darkness Slider */}
+            {settings.bgImageUrl && (
+              <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Sliders className="w-4 h-4 text-amber-400" />
+                    <span>میزان تیرگی پس‌زمینه جهت خوانایی بهتر متون:</span>
+                  </span>
+                  <span className="font-mono text-amber-300 font-bold">{settings.bgDarkness}٪</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="80"
+                  step="5"
+                  value={settings.bgDarkness}
+                  onChange={(e) => onUpdateSettings({ bgDarkness: Number(e.target.value) })}
+                  className="w-full accent-amber-400 cursor-pointer"
+                />
+              </div>
+            )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 5. Stage Color Themes */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <Palette className="w-4 h-4 text-amber-400" />
+                <span>تم رنگی سالن تشریفات (هنگام عدم استفاده از عکس):</span>
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {THEME_OPTIONS.map((theme) => {
-                  const isSelected = settings.themePreset === theme.id && !settings.bgImageUrl;
+                  const isSelected = settings.themePreset === theme.id;
                   return (
                     <button
                       key={theme.id}
                       type="button"
                       onClick={() => onUpdateSettings({ themePreset: theme.id })}
-                      className={`relative p-3 rounded-2xl border text-right transition cursor-pointer flex flex-col gap-2 overflow-hidden ${
+                      className={`p-3 rounded-xl border text-right transition flex items-start gap-3 cursor-pointer ${
                         isSelected
-                          ? 'border-amber-400 bg-slate-800/80 shadow-lg shadow-amber-500/10'
-                          : 'border-slate-800 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-800/40'
+                          ? 'border-amber-400 bg-amber-500/10 shadow-md shadow-amber-500/10'
+                          : 'border-slate-800 hover:border-slate-700 bg-slate-900/40'
                       }`}
                     >
-                      <div className={`w-full h-10 rounded-xl bg-linear-to-r ${theme.gradient} border border-white/10 flex items-center justify-end px-3`}>
+                      <div
+                        className={`w-9 h-9 rounded-xl bg-linear-to-br ${theme.gradient} border border-white/20 shrink-0 flex items-center justify-center mt-0.5`}
+                      >
                         {isSelected && (
                           <div className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow">
                             <Check className="w-3.5 h-3.5" />
@@ -344,7 +441,194 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
           </div>
         )}
 
-        {/* Tab 2: Lottery Algorithm & Fairness Transparency */}
+        {/* Tab 2: Login Screen Customization */}
+        {activeTab === 'login' && (
+          <div className="py-4 space-y-5 overflow-y-auto max-h-[65vh]">
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                تمام تغییرات متون و لوگوی این بخش به طور مستقیم در دیتابیس سرور (<code className="font-mono text-white">lottery.db</code>) ذخیره می‌شوند.
+              </span>
+            </div>
+
+            {/* Field 1: Login SubTitle (سامانه قرعه‌کشی و اعطای تسهیلات) */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between">
+                <label htmlFor="input-login-subtitle" className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-amber-400" />
+                  <span>عنوان اصلی بالای صفحه لاگین (زیر لوگو):</span>
+                </label>
+                {settings.loginSubTitle !== 'سامانه قرعه‌کشی و اعطای تسهیلات' && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ loginSubTitle: 'سامانه قرعه‌کشی و اعطای تسهیلات' })}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 transition cursor-pointer"
+                  >
+                    بازنشانی به پیش‌فرض
+                  </button>
+                )}
+              </div>
+              <input
+                id="input-login-subtitle"
+                type="text"
+                value={settings.loginSubTitle ?? 'سامانه قرعه‌کشی و اعطای تسهیلات'}
+                onChange={(e) => onUpdateSettings({ loginSubTitle: e.target.value })}
+                placeholder="سامانه قرعه‌کشی و اعطای تسهیلات"
+                className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none transition"
+              />
+            </div>
+
+            {/* Field 2: Login Header Title (ورود به پنل مدیریت) */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between">
+                <label htmlFor="input-login-headertitle" className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                  <LogIn className="w-4 h-4 text-amber-400" />
+                  <span>متن زیرعنوان صفحه لاگین:</span>
+                </label>
+                {settings.loginHeaderTitle !== 'ورود به پنل مدیریت' && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ loginHeaderTitle: 'ورود به پنل مدیریت' })}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 transition cursor-pointer"
+                  >
+                    بازنشانی به پیش‌فرض
+                  </button>
+                )}
+              </div>
+              <input
+                id="input-login-headertitle"
+                type="text"
+                value={settings.loginHeaderTitle ?? 'ورود به پنل مدیریت'}
+                onChange={(e) => onUpdateSettings({ loginHeaderTitle: e.target.value })}
+                placeholder="ورود به پنل مدیریت"
+                className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none transition"
+              />
+            </div>
+
+            {/* Field 3: Login Top Logo (جایگزین عکس جام) */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <span>آیکون / لوگوی بالای صفحه لاگین (جایگزین عکس جام):</span>
+                </span>
+                {settings.loginLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="text-xs text-red-400 hover:text-red-300 transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف و بازگشت به جام طلایی</span>
+                  </button>
+                )}
+              </div>
+
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+
+              <div className="flex items-center gap-4">
+                {/* Current Logo Preview */}
+                <div className="w-20 h-20 rounded-2xl bg-slate-950 border-2 border-amber-500/40 flex items-center justify-center p-2 shrink-0 overflow-hidden shadow-lg">
+                  {settings.loginLogoUrl ? (
+                    <img
+                      src={settings.loginLogoUrl}
+                      alt="لوگوی صفحه لاگین"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <Trophy className="w-8 h-8 text-amber-400 mx-auto" />
+                      <span className="text-[9px] text-slate-400 block mt-1">جام پیش‌فرض</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{settings.loginLogoUrl ? 'تغییر تصویر لوگو' : 'بارگذاری لوگو یا نشان اختصاصی'}</span>
+                  </button>
+                  <p className="text-[11px] text-slate-400">
+                    تصویر آرم شرکت، دانشگاه یا سازمان با فرمت PNG (ترجیحاً پس‌زمینه شفاف) یا JPG
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Field 4: Login Background Note */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 space-y-1">
+              <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-purple-400" />
+                <span>تصویر پس‌زمینه صفحه لاگین:</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                تصویر پس‌زمینه صفحه لاگین به طور خودکار از تصویر پس‌زمینه فعال دیتابیس (انتخاب‌شده در تب ظاهر استیج) استفاده می‌کند و با بازنشانی یا تغییر در دیتابیس همگام می‌ماند.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Database Backup & Restore */}
+        {activeTab === 'backup' && (
+          <div className="py-4 space-y-5 overflow-y-auto max-h-[65vh]">
+            <div className="p-5 rounded-2xl bg-linear-to-br from-amber-950/30 via-slate-900 to-slate-950 border-2 border-amber-500/40 shadow-xl space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-lg">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-white flex items-center gap-2">
+                    <span>مرکز پشتیبان‌گیری و بازگردانی جامع دیتابیس</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                      تضمین سازگاری در آپدیت‌ها
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    این ابزار به شما امکان می‌دهد از تمامی اطلاعات دیتابیس شامل لیست کامل شرکت‌کنندگان، برندگان، سوابق دوره‌های قرعه‌کشی، تصاویر پس‌زمینه با کیفیت اصلی و تنظیمات، فایل پشتیبان <code className="text-amber-300 font-mono">.lotterybackup</code> دریافت کنید.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <FileCheck className="w-3.5 h-3.5" />
+                  <span>مزیت ویژه در نسخه‌ها و آپدیت‌های آینده:</span>
+                </div>
+                <p>
+                  در صورت به‌روزرسانی نرم‌افزار، اسکیما و ستون‌های دیتابیس به صورت هوشمند تطبیق داده می‌شوند و داده‌های شما بدون خطا و با صحت کامل بازیابی خواهند شد.
+                </p>
+              </div>
+
+              {onOpenBackupModal && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenBackupModal();
+                    }}
+                    className="w-full py-3.5 px-6 rounded-xl bg-linear-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-amber-500/25 transition cursor-pointer active:scale-[0.99]"
+                  >
+                    <Database className="w-5 h-5" />
+                    <span>ورود به پنجره پشتیبان‌گیری و بازیابی دیتابیس</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Lottery Algorithm & Fairness Transparency */}
         {activeTab === 'algorithm' && (
           <div className="py-4 space-y-4 overflow-y-auto max-h-[65vh] text-slate-200 text-xs leading-relaxed">
             {/* Header Banner */}
@@ -384,53 +668,23 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
               </p>
             </div>
 
-            {/* Step 2: CSPRNG Hardware Randomness */}
+            {/* Step 2: CSPRNG Hardware Random Selection */}
             <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
                 <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center font-mono text-xs text-amber-300">
                   ۲
                 </div>
-                <Cpu className="w-4 h-4 text-amber-400" />
-                <span>مرحله دوم: تولید انتروپی تصادفی سخت‌افزاری (CSPRNG)</span>
+                <Binary className="w-4 h-4 text-amber-400" />
+                <span>مرحله دوم: تولید عدد تصادفی با آنتروپی سخت‌افزاری (CSPRNG)</span>
               </div>
               <p className="text-slate-300 text-[11px] pr-8">
-                به جای توابع معمولی سیستم‌ها، این سامانه از API امن <code>window.crypto.getRandomValues</code> و نمونه‌برداری دفعی (Rejection Sampling) استفاده می‌کند.
+                انتخاب برنده با تابع استاندارد مرورگر <code className="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">window.crypto.getRandomValues</code> انجام می‌گیرد (نه تابع Math.random معمولی).
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pr-8 pt-1 text-[11px]">
-                <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
-                  <div className="font-bold text-amber-300 mb-1 flex items-center gap-1">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    غیرقابل پیش‌بینی (Non-deterministic)
-                  </div>
-                  <div className="text-slate-400 text-[10.5px]">
-                    اعداد تصادفی از نویز فیزیکی پردازنده دستگاه استخراج می‌شوند و توسط هیچ فردی قابل پیش‌بینی یا مداخله نیستند.
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
-                  <div className="font-bold text-emerald-300 mb-1 flex items-center gap-1">
-                    <Binary className="w-3.5 h-3.5 text-emerald-400" />
-                    حذف خطای پیمانه (Zero Modulo Bias)
-                  </div>
-                  <div className="text-slate-400 text-[10.5px]">
-                    با استفاده از تکنیک Rejection Sampling، شانس انتخاب نفر اول، وسط یا آخر لیست تا آخرین رقم اعشار یکسان است.
-                  </div>
-                </div>
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400 space-y-1 font-mono pr-8">
+                <div>• تولید عدد ۳۲ بیتی تصادفی: <span className="text-amber-300">UInt32 (0 تا 4,294,967,295)</span></div>
+                <div>• فرمول ایندکس برنده: <span className="text-emerald-400">winnerIndex = UInt32 % N</span></div>
+                <div>• برنده قطعی: <span className="text-amber-300">shuffledParticipants[winnerIndex]</span></div>
               </div>
-            </div>
-
-            {/* Step 3: Anti-Duplicate Guaranteed System */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
-                <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center font-mono text-xs text-amber-300">
-                  ۳
-                </div>
-                <RefreshCw className="w-4 h-4 text-amber-400" />
-                <span>مرحله سوم: حذف تضمینی برنده از استخر شرکت‌کنندگان دورهای بعد</span>
-              </div>
-              <p className="text-slate-300 text-[11px] pr-8">
-                به محض انتخاب و تأیید برنده در هر دور، مشخصات فرد در پایگاه داده مستقل ذخیره شده و از فهرست افراد فعال فوراً کسر می‌شود. بدین ترتیب هیچ فردی امکان برنده شدن بیش از یک بار در یک دوره را نخواهد داشت.
-              </p>
             </div>
 
             {/* Mathematical Summary Card */}
@@ -450,14 +704,14 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
         <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
           <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>تضمین سلامت و مساوات قرعه‌کشی با CSPRNG & Fisher-Yates</span>
+            <span>ذخیره‌سازی پایدار و امن در دیتابیس SQLite</span>
           </div>
 
           <button
             onClick={onClose}
             className="px-6 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition cursor-pointer"
           >
-            تأیید و بازگشت به صحنه
+            تأیید و بستن پنجره
           </button>
         </div>
       </div>

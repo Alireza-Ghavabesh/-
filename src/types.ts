@@ -91,4 +91,36 @@ export interface AppSettings {
   bgImageUrl: string | null;
   bgDarkness: number; // 0 to 80%
   themePreset: ThemePreset;
+  // Login Screen Customization
+  loginHeaderTitle: string; // "ورود به پنل مدیریت"
+  loginSubTitle: string; // "سامانه قرعه‌کشی و اعطای تسهیلات"
+  loginLogoUrl: string | null; // Custom uploaded image logo/icon (base64)
 }
+
+export interface BackupStats {
+  participantsCount: number;
+  winnersCount: number;
+  sessionsCount: number;
+  backgroundsCount: number;
+  settingsCount: number;
+  adminsCount?: number;
+}
+
+export interface BackupInspectionResult {
+  isValid: boolean;
+  version: string;
+  formatVersion: number;
+  exportedAt: string | null;
+  persianDate: string;
+  stats: BackupStats;
+  notes?: string[];
+}
+
+export interface BackupSnapshot {
+  filename: string;
+  sizeBytes: number;
+  sizeKb: number;
+  createdAt: string;
+  persianDate: string;
+}
+

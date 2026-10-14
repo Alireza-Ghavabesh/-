@@ -1085,6 +1085,331 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // --- Full Database Backup & Restore APIs ---
+  // ==========================================
+
+  // 1. Export entire database as universal, forward-compatible structured backup
+  app.get('/api/backup/export', (req, res) => {
+    try {
+      saveDb();
+
+      // Collect data from all tables safely
+      const participants = queryAll('SELECT * FROM participants ORDER BY original_row_index ASC');
+      const winners = queryAll('SELECT * FROM winners ORDER BY draw_round ASC');
+      const lotterySessions = queryAll('SELECT * FROM lottery_sessions ORDER BY created_at DESC');
+      const customBackgrounds = queryAll('SELECT * FROM custom_backgrounds ORDER BY created_at DESC');
+      const appSettings = queryAll('SELECT * FROM app_settings');
+      const admins = queryAll('SELECT id, username, password_hash, name, is_super_admin, created_at, updated_at FROM admins');
+      const authorizedDevices = queryAll('SELECT * FROM authorized_devices');
+      const systemLicense = queryAll('SELECT * FROM system_license');
+
+      const now = new Date();
+      const backupObj = {
+        app: 'lottery-master',
+        format: 'lottery-master-universal-backup',
+        version: '2.5.0',
+        formatVersion: 2,
+        exportedAt: now.toISOString(),
+        persianDate: now.toLocaleDateString('fa-IR') + ' ' + now.toLocaleTimeString('fa-IR'),
+        systemInfo: {
+          platform: process.platform,
+          nodeVersion: process.version,
+        },
+        stats: {
+          participantsCount: participants.length,
+          winnersCount: winners.length,
+          sessionsCount: lotterySessions.length,
+          backgroundsCount: customBackgrounds.length,
+          settingsCount: appSettings.length,
+          adminsCount: admins.length,
+        },
+        data: {
+          participants,
+          winners,
+          lottery_sessions: lotterySessions,
+          custom_backgrounds: customBackgrounds,
+          app_settings: appSettings,
+          admins,
+          authorized_devices: authorizedDevices,
+          system_license: systemLicense,
+        },
+      };
+
+      if (req.query.download === '1') {
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        res.setHeader('Content-Disposition', `attachment; filename="lottery-backup-${timestamp}.lotterybackup"`);
+        res.setHeader('Content-Type', 'application/json');
+        res.send(JSON.stringify(backupObj, null, 2));
+      } else {
+        res.json({ success: true, backup: backupObj });
+      }
+    } catch (err: unknown) {
+      console.error('Backup export error:', err);
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // 2. Direct download of raw SQLite database file (lottery.db)
+  app.get('/api/backup/download-db', (req, res) => {
+    try {
+      saveDb();
+      if (!fs.existsSync(DB_FILE)) {
+        res.status(404).json({ success: false, error: 'فایل دیتابیس در مسیر سرور یافت نشد' });
+        return;
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      res.setHeader('Content-Disposition', `attachment; filename="lottery-${timestamp}.db"`);
+      res.setHeader('Content-Type', 'application/x-sqlite3');
+      const fileStream = fs.createReadStream(DB_FILE);
+      fileStream.pipe(res);
+    } catch (err: unknown) {
+      console.error('Download DB error:', err);
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // 3. Inspect and validate backup file before restoring
+  app.post('/api/backup/inspect', (req, res) => {
+    try {
+      let { backupData } = req.body;
+      if (!backupData) {
+        res.status(400).json({ success: false, error: 'داده‌های پشتیبان ارسال نشده است' });
+        return;
+      }
+      if (backupData && typeof backupData === 'object' && backupData.backup) {
+        backupData = backupData.backup;
+      }
+
+      // Check structure
+      const isUniversal = backupData.format === 'lottery-master-universal-backup' || Boolean(backupData.data);
+      if (!isUniversal || !backupData.data) {
+        res.status(400).json({
+          success: false,
+          error: 'فرمت فایل معتبر نیست. لطفاً یک فایل بکاپ استاندارد با پسوند .lotterybackup یا .json انتخاب کنید.',
+        });
+        return;
+      }
+
+      const data = backupData.data;
+      const stats = {
+        participantsCount: Array.isArray(data.participants) ? data.participants.length : 0,
+        winnersCount: Array.isArray(data.winners) ? data.winners.length : 0,
+        sessionsCount: Array.isArray(data.lottery_sessions) ? data.lottery_sessions.length : 0,
+        backgroundsCount: Array.isArray(data.custom_backgrounds) ? data.custom_backgrounds.length : 0,
+        settingsCount: Array.isArray(data.app_settings) ? data.app_settings.length : 0,
+        adminsCount: Array.isArray(data.admins) ? data.admins.length : 0,
+      };
+
+      res.json({
+        success: true,
+        isValid: true,
+        version: backupData.version || '1.0.0',
+        formatVersion: backupData.formatVersion || 1,
+        exportedAt: backupData.exportedAt || null,
+        persianDate: backupData.persianDate || 'نامشخص',
+        stats,
+        notes: [
+          'سازگار با تمام نسخه‌های قبلی و آینده نرم‌افزار',
+          'ستون‌های جدید یا تغییریافته به طور خودکار تطبیق داده خواهند شد',
+        ],
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // 4. Restore structured backup with dynamic schema-evolution & automatic snapshot
+  app.post('/api/backup/restore', (req, res) => {
+    try {
+      let { backupData, mode = 'replace', restoreSettings = true, restoreAdmins = false } = req.body;
+      if (!backupData) {
+        res.status(400).json({ success: false, error: 'داده‌های پشتیبان ارسال نشده است' });
+        return;
+      }
+      if (backupData && typeof backupData === 'object' && backupData.backup) {
+        backupData = backupData.backup;
+      }
+      if (!backupData.data) {
+        res.status(400).json({ success: false, error: 'داده‌های پشتیبان نامعتبر هستند' });
+        return;
+      }
+
+      // Create a safety snapshot of current DB on disk before modifying
+      try {
+        saveDb();
+        if (fs.existsSync(DB_FILE)) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const snapshotPath = path.join(process.cwd(), `lottery.db.backup-${timestamp}.bak`);
+          fs.copyFileSync(DB_FILE, snapshotPath);
+          console.log(`[Backup] Created emergency safety snapshot at: ${snapshotPath}`);
+        }
+      } catch (backupErr) {
+        console.warn('Could not create emergency snapshot file:', backupErr);
+      }
+
+      const tablesToProcess = [
+        'participants',
+        'winners',
+        'lottery_sessions',
+        'custom_backgrounds',
+        'app_settings',
+        'admins',
+        'authorized_devices',
+        'system_license',
+      ];
+
+      const restoredCounts: Record<string, number> = {};
+
+      // Begin atomic transaction
+      db.run('BEGIN TRANSACTION');
+
+      try {
+        for (const tableName of tablesToProcess) {
+          if (tableName === 'admins' && !restoreAdmins) {
+            continue; // Keep existing admin credentials if user unchecked
+          }
+          if (tableName === 'app_settings' && !restoreSettings) {
+            continue; // Keep existing settings if user unchecked
+          }
+
+          const rawRows = backupData.data[tableName];
+          if (!Array.isArray(rawRows)) {
+            continue;
+          }
+
+          // Dynamic Schema Discovery:
+          // Query PRAGMA table_info to get the exact columns currently existing in the active database
+          const tableInfo = queryAll(`PRAGMA table_info(${tableName})`);
+          if (!tableInfo || tableInfo.length === 0) {
+            console.warn(`Table ${tableName} does not exist in active schema, skipping.`);
+            continue;
+          }
+
+          const validColumnNames = tableInfo.map((c) => String(c.name));
+          const validColumnSet = new Set(validColumnNames);
+
+          if (mode === 'replace') {
+            db.run(`DELETE FROM ${tableName}`);
+          }
+
+          let inserted = 0;
+          for (const row of rawRows) {
+            if (!row || typeof row !== 'object') continue;
+
+            // Filter row keys to only columns that actually exist in the current database schema.
+            // 1. If backup is from an older version: newly added columns in SQLite will automatically get NULL/defaults.
+            // 2. If backup is from a newer version with extra fields: unknown columns are skipped safely without SQL error.
+            const rowKeys = Object.keys(row).filter((k) => validColumnSet.has(k));
+            if (rowKeys.length === 0) continue;
+
+            const placeholders = rowKeys.map(() => '?').join(', ');
+            const quotedColumns = rowKeys.map((k) => `"${k}"`).join(', ');
+            const values = rowKeys.map((k) => (row as Record<string, unknown>)[k] ?? null);
+
+            const sql = `INSERT OR REPLACE INTO ${tableName} (${quotedColumns}) VALUES (${placeholders})`;
+            db.run(sql, values as (string | number | null)[]);
+            inserted++;
+          }
+
+          restoredCounts[tableName] = inserted;
+        }
+
+        db.run('COMMIT');
+        saveDb();
+        console.log('[Backup] Database restored successfully with counts:', restoredCounts);
+
+        res.json({
+          success: true,
+          restoredCounts,
+          message: 'دیتابیس با موفقیت بازگردانی شد و تمام اطلاعات با نسخه فعال همگام گردید.',
+        });
+      } catch (txErr) {
+        db.run('ROLLBACK');
+        throw txErr;
+      }
+    } catch (err: unknown) {
+      console.error('Restore error:', err);
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // 5. Restore from raw SQLite .db file (uploaded as Base64)
+  app.post('/api/backup/restore-raw-db', async (req, res) => {
+    try {
+      const { fileBase64 } = req.body;
+      if (!fileBase64) {
+        res.status(400).json({ success: false, error: 'فایل دیتابیس ارسال نشده است' });
+        return;
+      }
+
+      // Create snapshot before replacing
+      saveDb();
+      if (fs.existsSync(DB_FILE)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const snapshotPath = path.join(process.cwd(), `lottery.db.backup-${timestamp}.bak`);
+        fs.copyFileSync(DB_FILE, snapshotPath);
+      }
+
+      const buffer = Buffer.from(fileBase64.replace(/^data:.*?;base64,/, ''), 'base64');
+      const SQL = await initSqlJs();
+      const newDb = new SQL.Database(buffer);
+
+      // Verify that this database is a valid lottery database
+      const testStmt = newDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='participants'");
+      const hasParticipants = testStmt.step();
+      testStmt.free();
+
+      if (!hasParticipants) {
+        res.status(400).json({
+          success: false,
+          error: 'فایل ارسالی یک دیتابیس معتبر قرعه‌کشی نیست یا جدول شرکت‌کنندگان در آن یافت نشد.',
+        });
+        return;
+      }
+
+      // Replace active database
+      db = newDb;
+      fs.writeFileSync(DB_FILE, buffer);
+      console.log('[Backup] Raw SQLite database file successfully restored');
+
+      res.json({
+        success: true,
+        message: 'فایل فیزیکی دیتابیس با موفقیت جایگزین و بارگذاری شد.',
+      });
+    } catch (err: unknown) {
+      console.error('Restore raw db error:', err);
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  // 6. Get list of automatic pre-restore safety snapshots
+  app.get('/api/backup/snapshots', (req, res) => {
+    try {
+      const files = fs.readdirSync(process.cwd());
+      const snapshots = files
+        .filter((f) => f.startsWith('lottery.db.backup-') && f.endsWith('.bak'))
+        .map((f) => {
+          const stats = fs.statSync(path.join(process.cwd(), f));
+          return {
+            filename: f,
+            sizeBytes: stats.size,
+            sizeKb: Math.round(stats.size / 1024),
+            createdAt: stats.mtime.toISOString(),
+            persianDate:
+              new Date(stats.mtime).toLocaleDateString('fa-IR') +
+              ' ' +
+              new Date(stats.mtime).toLocaleTimeString('fa-IR'),
+          };
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+      res.json({ success: true, snapshots });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
   // --- Serve Frontend ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trophy,
   Lock,
@@ -12,7 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import { AdminUser } from '../types';
-import { loginAdmin, authorizeNewMachine } from '../utils/api';
+import { loginAdmin, authorizeNewMachine, fetchSettingsFromDb, fetchBackgroundsFromDb } from '../utils/api';
 
 interface AdminLoginScreenProps {
   onLoginSuccess: (user: AdminUser) => void;
@@ -24,6 +24,36 @@ export const AdminLoginScreen: React.FC<AdminLoginScreenProps> = ({ onLoginSucce
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Customization loaded directly from SQLite database
+  const [loginHeaderTitle, setLoginHeaderTitle] = useState('ورود به پنل مدیریت');
+  const [loginSubTitle, setLoginSubTitle] = useState('سامانه قرعه‌کشی و اعطای تسهیلات');
+  const [loginLogoUrl, setLoginLogoUrl] = useState<string | null>(null);
+  const [loginBgUrl, setLoginBgUrl] = useState<string | null>(null);
+  const [bgDarkness, setBgDarkness] = useState(45);
+
+  useEffect(() => {
+    // Load custom login texts, custom logo, and active background from SQLite database
+    fetchSettingsFromDb().then((dbSettings) => {
+      if (dbSettings) {
+        if (dbSettings.loginHeaderTitle) setLoginHeaderTitle(dbSettings.loginHeaderTitle);
+        if (dbSettings.loginSubTitle) setLoginSubTitle(dbSettings.loginSubTitle);
+        if (dbSettings.loginLogoUrl && dbSettings.loginLogoUrl.trim() !== '') {
+          setLoginLogoUrl(dbSettings.loginLogoUrl);
+        }
+        if (dbSettings.bgDarkness) setBgDarkness(Number(dbSettings.bgDarkness) || 45);
+      }
+    });
+
+    fetchBackgroundsFromDb().then((bgs) => {
+      if (bgs && bgs.length > 0) {
+        const activeBg = bgs.find((b) => b.isActive) || bgs[0];
+        if (activeBg?.imageBase64) {
+          setLoginBgUrl(activeBg.imageBase64);
+        }
+      }
+    });
+  }, []);
 
   // Machine authorization dialog state (only if accessed from an unauthorized computer)
   const [showAuthorizeModal, setShowAuthorizeModal] = useState(false);
@@ -92,29 +122,62 @@ export const AdminLoginScreen: React.FC<AdminLoginScreenProps> = ({ onLoginSucce
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-950 font-sans overflow-hidden select-none" dir="rtl">
+    <div
+      className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-950 font-sans overflow-hidden select-none"
+      dir="rtl"
+      style={
+        loginBgUrl
+          ? {
+              backgroundImage: `url(${loginBgUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center center',
+              backgroundRepeat: 'no-repeat',
+            }
+          : undefined
+      }
+    >
+      {/* Background Readability Darkness Overlay */}
+      {loginBgUrl && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-300"
+          style={{
+            backgroundColor: `rgba(2, 6, 23, ${bgDarkness / 100})`,
+          }}
+        />
+      )}
+
       {/* Background Ambience & Golden Glows */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(217,119,6,0.18),rgba(15,23,42,0.98))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(217,119,6,0.18),rgba(15,23,42,0.98))] pointer-events-none" />
       <div className="absolute top-1/4 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 -left-24 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6">
         
-        {/* Header with Trophy Icon */}
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-linear-to-br from-amber-400 via-yellow-500 to-amber-600 p-0.5 shadow-xl shadow-amber-500/25 flex items-center justify-center">
-            <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center">
-              <Trophy className="w-8 h-8 text-amber-300" />
+        {/* Header with Custom Logo from Database or Default Trophy Icon */}
+        <div className="text-center space-y-3">
+          {loginLogoUrl ? (
+            <div className="mx-auto w-20 h-20 rounded-2xl p-1.5 bg-slate-950/80 border-2 border-amber-500/50 shadow-xl shadow-amber-500/25 flex items-center justify-center overflow-hidden">
+              <img
+                src={loginLogoUrl}
+                alt="لوگوی سیستم"
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
-          </div>
+          ) : (
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-linear-to-br from-amber-400 via-yellow-500 to-amber-600 p-0.5 shadow-xl shadow-amber-500/25 flex items-center justify-center">
+              <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center">
+                <Trophy className="w-8 h-8 text-amber-300" />
+              </div>
+            </div>
+          )}
 
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-white via-amber-200 to-amber-400">
-              سامانه قرعه‌کشی و اعطای تسهیلات
+              {loginSubTitle}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
-              ورود به پنل مدیریت
+              {loginHeaderTitle}
             </p>
           </div>
         </div>

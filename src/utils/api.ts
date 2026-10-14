@@ -1,4 +1,15 @@
-import { Winner, Participant, CustomBackground, LotterySession, AdminUser, AuthorizedDevice, MachineStatus } from '../types';
+import {
+  Winner,
+  Participant,
+  CustomBackground,
+  LotterySession,
+  AdminUser,
+  AuthorizedDevice,
+  MachineStatus,
+  BackupStats,
+  BackupInspectionResult,
+  BackupSnapshot,
+} from '../types';
 import { getDeviceFingerprint, getDeviceDetails } from './deviceFingerprint';
 
 /**
@@ -482,3 +493,113 @@ export async function saveSettingsToDb(settings: Record<string, unknown>): Promi
     return false;
   }
 }
+
+// --- Database Backup & Restore APIs ---
+
+export async function fetchBackupExport(): Promise<{ success: boolean; backup?: any; error?: string }> {
+  try {
+    const res = await fetch('/api/backup/export');
+    if (!res.ok) {
+      return { success: false, error: 'خطا در دریافت پشتیبان از سرور' };
+    }
+    const data = await res.json();
+    return { success: true, backup: data.backup };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم اتصال به سرور' };
+  }
+}
+
+export function getBackupDownloadUrl(): string {
+  return '/api/backup/export?download=1';
+}
+
+export function getRawDbDownloadUrl(): string {
+  return '/api/backup/download-db';
+}
+
+export async function inspectBackupData(backupData: any): Promise<{
+  success: boolean;
+  result?: BackupInspectionResult;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/backup/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backupData }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        result: {
+          isValid: data.isValid,
+          version: data.version,
+          formatVersion: data.formatVersion,
+          exportedAt: data.exportedAt,
+          persianDate: data.persianDate,
+          stats: data.stats,
+          notes: data.notes,
+        },
+      };
+    }
+    return { success: false, error: data.error || 'فایل پشتیبان معتبر نیست' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم اتصال به سرور' };
+  }
+}
+
+export async function restoreBackup(options: {
+  backupData: any;
+  mode?: 'replace' | 'merge';
+  restoreSettings?: boolean;
+  restoreAdmins?: boolean;
+}): Promise<{ success: boolean; restoredCounts?: Record<string, number>; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        restoredCounts: data.restoredCounts,
+        message: data.message,
+      };
+    }
+    return { success: false, error: data.error || 'خطا در بازگردانی نسخه پشتیبان' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function restoreRawDbFile(fileBase64: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/backup/restore-raw-db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileBase64 }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, message: data.message };
+    }
+    return { success: false, error: data.error || 'خطا در بارگذاری فایل دیتابیس' };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error)?.message || 'عدم برقراری ارتباط با سرور' };
+  }
+}
+
+export async function fetchBackupSnapshots(): Promise<BackupSnapshot[]> {
+  try {
+    const res = await fetch('/api/backup/snapshots');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.snapshots || [];
+  } catch {
+    return [];
+  }
+}
+

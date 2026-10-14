@@ -237,17 +237,14 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
             </button>
           )}
 
-          {/* Admin Management Modal Trigger */}
+          {/* Admin Management Modal Trigger (Icon only without text) */}
           {onOpenAdminManagement && (
             <button
               onClick={onOpenAdminManagement}
               title="مدیریت کاربران و تغییر رمز ادمین"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-amber-500/40 text-amber-300 hover:text-white transition cursor-pointer shadow-sm text-xs font-bold"
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-amber-400 hover:text-white transition cursor-pointer"
             >
-              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="hidden sm:inline">
-                {currentUser?.name || currentUser?.username || 'مدیران'}
-              </span>
+              <ShieldCheck className="w-4 h-4" />
             </button>
           )}
 
