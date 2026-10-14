@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Participant, Winner } from '../types';
+import { Participant, Winner, LotteryMode } from '../types';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
-import { Trophy, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff, Gift } from 'lucide-react';
+import {
+  Trophy,
+  CheckCircle2,
+  RotateCcw,
+  Award,
+  User,
+  Coins,
+  Hash,
+  Gift,
+  AtSign,
+  Copy,
+  Check,
+} from 'lucide-react';
 
 interface WinnerModalProps {
   winner: Participant | null;
@@ -16,6 +28,7 @@ interface WinnerModalProps {
   prizeItemName?: string;
   showExcelRow?: boolean;
   showPersonnelCode?: boolean;
+  lotteryMode?: LotteryMode;
   onConfirmWinner: (confirmedWinner: Winner) => void;
   onDiscardAndRedraw: () => void;
 }
@@ -24,7 +37,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   winner,
   prizeTitle,
   drawRound,
-  maskMobile: initialMaskMobile,
+  maskMobile: _initialMaskMobile,
   loanAmount,
   useSettingsLoanAmount = true,
   prizeType = 'monetary',
@@ -32,10 +45,11 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   prizeItemName,
   showExcelRow = true,
   showPersonnelCode = true,
+  lotteryMode = 'personnel',
   onConfirmWinner,
   onDiscardAndRedraw,
 }) => {
-  const [showFullMobile, setShowFullMobile] = useState(!initialMaskMobile);
+  const [copied, setCopied] = useState(false);
   const winnerRankTitle = getWinnerOrdinalTitle(drawRound);
 
   const effectiveLoanRaw = (useSettingsLoanAmount || !winner?.creditDeferred)
@@ -43,6 +57,8 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
     : winner?.creditDeferred;
 
   const loanInfo = effectiveLoanRaw ? formatLoanAmount(effectiveLoanRaw) : (winner ? formatLoanAmount(winner.creditDeferred) : null);
+
+  const isInstagram = lotteryMode === 'instagram' || Boolean(winner?.instagramUsername) || winner?.personnelCode === '---';
 
   useEffect(() => {
     if (!winner) return;
@@ -76,6 +92,13 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
 
   if (!winner) return null;
 
+  const handleCopyUsername = () => {
+    const handle = winner.instagramUsername ? `@${winner.instagramUsername}` : winner.fullName;
+    navigator.clipboard.writeText(handle);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleConfirm = () => {
     const isItem = prizeType === 'item';
     const displayPrizeTitle = isItem
@@ -93,14 +116,10 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
       prizeType: prizeType || 'monetary',
       prizeLabel: prizeLabel || 'وام',
       prizeItemName: prizeItemName || (isItem ? displayPrizeTitle : ''),
+      lotteryMode: isInstagram ? 'instagram' : 'personnel',
+      instagramUsername: winner.instagramUsername || (isInstagram ? winner.fullName.replace(/^@/, '') : undefined),
     };
     onConfirmWinner(winnerRecord);
-  };
-
-  const getDisplayMobile = () => {
-    if (!winner.mobile || winner.mobile === '---') return 'ثبت نشده';
-    if (showFullMobile || winner.mobile.length < 8) return winner.mobile;
-    return `${winner.mobile.substring(0, 4)}***${winner.mobile.substring(winner.mobile.length - 4)}`;
   };
 
   return (
@@ -135,21 +154,46 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
           🎉 مشخص شدن {winnerRankTitle} 🎉
         </h2>
         <p className="text-xs text-slate-400 mb-6">
-          نام {winnerRankTitle} با موفقیت توسط گردونه شانس انتخاب گردید
+          {isInstagram
+            ? `آیدی ${winnerRankTitle} با موفقیت توسط گردونه شانس انتخاب گردید`
+            : `نام ${winnerRankTitle} با موفقیت توسط گردونه شانس انتخاب گردید`}
         </p>
 
         {/* Winner Big Spotlight Card */}
         <div className="w-full bg-slate-950/85 border-2 border-amber-400/70 rounded-3xl p-6 md:p-8 mb-6 shadow-[0_0_40px_rgba(251,191,36,0.15)] flex flex-col items-center">
-          <span className="text-xs md:text-sm font-bold text-amber-400/90 tracking-widest uppercase mb-1">
-            برنده خوش‌شانس این دور
+          <span className="text-xs md:text-sm font-bold text-amber-400/90 tracking-widest uppercase mb-1 flex items-center gap-1.5">
+            {isInstagram && <AtSign className="w-3.5 h-3.5 text-pink-400" />}
+            <span>برنده خوش‌شانس این دور {isInstagram ? '(اینستاگرام)' : ''}</span>
           </span>
-          <div className="text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight text-center drop-shadow-[0_4px_20px_rgba(251,191,36,0.5)] my-3 leading-tight select-all">
-            {winner.fullName}
-          </div>
 
-          <div className="grid grid-cols-2 gap-3 w-full text-right text-xs md:text-sm">
-            {/* Personnel Code */}
-            {showPersonnelCode !== false && (
+          {isInstagram ? (
+            <div className="flex flex-col items-center gap-2 my-3">
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-2xl bg-linear-to-tr from-amber-500 via-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25">
+                  <AtSign className="w-6 h-6 sm:w-8 sm:h-8" />
+                </span>
+                <span className="text-3xl sm:text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight font-mono select-all">
+                  {winner.fullName}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyUsername}
+                className="mt-1 px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                <span>{copied ? 'آیدی کپی شد!' : 'کپی آیدی'}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight text-center drop-shadow-[0_4px_20px_rgba(251,191,36,0.5)] my-3 leading-tight select-all">
+              {winner.fullName}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 w-full text-right text-xs md:text-sm mt-2">
+            {/* Personnel Code (hidden if Instagram or disabled by user) */}
+            {showPersonnelCode !== false && !isInstagram && winner.personnelCode !== '---' && (
               <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
                 showExcelRow === false ? 'col-span-2' : ''
               }`}>
@@ -164,7 +208,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
             {/* Excel Row */}
             {showExcelRow !== false && (
               <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
-                showPersonnelCode === false ? 'col-span-2' : ''
+                (showPersonnelCode === false || isInstagram || winner.personnelCode === '---') ? 'col-span-2' : ''
               }`}>
                 <span className="text-slate-400 flex items-center gap-1.5">
                   <User className="w-4 h-4 text-amber-400" />
@@ -232,7 +276,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
         </div>
 
         <p className="text-[11px] text-slate-400 mt-4">
-          با کلیک روی «ثبت {winnerRankTitle}»، این فرد به لیست برندگان منتقل شده و در قرعه‌کشی‌های بعدی شرکت نخواهد کرد.
+          با کلیک روی «ثبت {winnerRankTitle}»، این برنده در بایگانی ثبت شده و از دورهای بعدی قرعه‌کشی حذف می‌شود.
         </p>
       </div>
     </div>

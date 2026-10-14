@@ -33,6 +33,8 @@ import {
   FileSpreadsheet,
   Hash,
   Phone,
+  AtSign,
+  Briefcase,
 } from 'lucide-react';
 import { fetchBackgroundsFromDb, saveBackgroundToDb, activateBackgroundInDb, deleteBackgroundFromDb } from '../utils/api';
 import { formatLoanAmount } from '../utils/format';
@@ -473,6 +475,45 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
                       }`}
                     />
                   </button>
+                </div>
+
+                {/* 4. Default Lottery Mode */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-900/70 border border-slate-800 gap-3">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <AtSign className="w-4 h-4 text-pink-400" />
+                      <span>حالت پیش‌فرض قرعه‌کشی (سازمانی یا اینستاگرام)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      تعیین سبک پیش‌فرض برای اجرای قرعه‌کشی‌ها و استخراج اکسل
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSettings({ lotteryMode: 'personnel' })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        settings.lotteryMode !== 'instagram'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Briefcase className="w-3.5 h-3.5" />
+                      <span>سازمانی</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSettings({ lotteryMode: 'instagram' })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        settings.lotteryMode === 'instagram'
+                          ? 'bg-linear-to-r from-pink-500 to-purple-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <AtSign className="w-3.5 h-3.5" />
+                      <span>اینستاگرام</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, Winner, AppSettings, LotterySession, AdminUser } from './types';
+import { Participant, Winner, AppSettings, LotterySession, AdminUser, LotteryMode, ExcelParseReport } from './types';
 import { getDemoParticipants } from './utils/excel';
 import { getWinnerOrdinalTitle } from './utils/format';
 import { LuckyWheel } from './components/LuckyWheel';
@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   prizeItemName: '',
   showExcelRow: true,
   showPersonnelCode: true,
+  lotteryMode: 'personnel',
   loginHeaderTitle: 'ورود به پنل مدیریت',
   loginSubTitle: 'سامانه قرعه‌کشی و اعطای تسهیلات',
   loginLogoUrl: null,
@@ -190,6 +191,7 @@ export default function App() {
               dbSettings.showPersonnelCode !== undefined
                 ? dbSettings.showPersonnelCode === 'true' || dbSettings.showPersonnelCode === '1'
                 : prev.showPersonnelCode ?? true,
+            lotteryMode: (dbSettings.lotteryMode as LotteryMode) || prev.lotteryMode || 'personnel',
           };
         });
       }
@@ -271,6 +273,7 @@ export default function App() {
             dbSettings.showPersonnelCode !== undefined
               ? dbSettings.showPersonnelCode === 'true' || dbSettings.showPersonnelCode === '1'
               : prev.showPersonnelCode ?? true,
+          lotteryMode: (dbSettings.lotteryMode as LotteryMode) || prev.lotteryMode || 'personnel',
         }));
       }
       if (bgs && bgs.length > 0) {
@@ -386,10 +389,14 @@ export default function App() {
     prizeItemName?: string;
     showExcelRow?: boolean;
     showPersonnelCode?: boolean;
+    lotteryMode?: LotteryMode;
   }) => {
     const sessionParticipants = newSessionData.participants && newSessionData.participants.length > 0
       ? newSessionData.participants
       : (masterParticipants.length > 0 ? masterParticipants : getDemoParticipants(459));
+
+    const detectedMode = newSessionData.lotteryMode
+      || (sessionParticipants.some((p) => Boolean(p.instagramUsername)) ? 'instagram' : 'personnel');
 
     const newSession: LotterySession = {
       id: `lottery-${Date.now()}`,
@@ -408,6 +415,7 @@ export default function App() {
       prizeItemName: newSessionData.prizeItemName,
       showExcelRow: newSessionData.showExcelRow !== undefined ? newSessionData.showExcelRow : (settings.showExcelRow !== false),
       showPersonnelCode: newSessionData.showPersonnelCode !== undefined ? newSessionData.showPersonnelCode : (settings.showPersonnelCode !== false),
+      lotteryMode: detectedMode,
     };
 
     setSessions((prev) => [newSession, ...prev]);
@@ -426,6 +434,7 @@ export default function App() {
       prizeItemName: newSession.prizeItemName,
       showExcelRow: newSession.showExcelRow,
       showPersonnelCode: newSession.showPersonnelCode,
+      lotteryMode: newSession.lotteryMode,
     });
 
     saveLotterySessionToDb(newSession);
@@ -456,6 +465,7 @@ export default function App() {
       prizeItemName: session.prizeItemName,
       showExcelRow: session.showExcelRow !== undefined ? session.showExcelRow : settings.showExcelRow,
       showPersonnelCode: session.showPersonnelCode !== undefined ? session.showPersonnelCode : settings.showPersonnelCode,
+      lotteryMode: session.lotteryMode || (sessionParticipants.some((p) => Boolean(p.instagramUsername)) ? 'instagram' : 'personnel'),
     });
   };
 
@@ -494,6 +504,7 @@ export default function App() {
         prizeItemName: updatedSession.prizeItemName,
         showExcelRow: updatedSession.showExcelRow,
         showPersonnelCode: updatedSession.showPersonnelCode,
+        lotteryMode: updatedSession.lotteryMode,
       });
     }
     saveLotterySessionToDb(updatedSession);
@@ -547,24 +558,28 @@ export default function App() {
     }
   };
 
-  const handleLoadNewParticipants = (newList: Participant[]) => {
+  const handleLoadNewParticipants = (newList: Participant[], report?: ExcelParseReport, mode?: LotteryMode) => {
+    const detectedMode = mode || report?.detectedMode || (newList.some((p) => Boolean(p.instagramUsername)) ? 'instagram' : 'personnel');
     setMasterParticipants(newList);
     setParticipants(newList);
     setWinners([]);
     setPendingWinner(null);
     saveParticipantsToDb(newList, true);
 
-    // If an active session exists, update its total participants count
+    // If an active session exists, update its total participants count and mode
     if (activeSession) {
       const updatedSession: LotterySession = {
         ...activeSession,
         totalParticipantsCount: newList.length,
+        participants: newList,
         winners: [],
+        lotteryMode: detectedMode,
       };
       setActiveSession(updatedSession);
       setSessions((prev) => prev.map((s) => (s.id === updatedSession.id ? updatedSession : s)));
       saveLotterySessionToDb(updatedSession);
     }
+    updateSettings({ lotteryMode: detectedMode });
   };
 
   const handleResetToDemo = () => {
@@ -628,6 +643,9 @@ export default function App() {
   const effectiveShowPersonnelCode = activeSession?.showPersonnelCode !== undefined
     ? activeSession.showPersonnelCode
     : (settings.showPersonnelCode !== false);
+
+  const effectiveLotteryMode: LotteryMode = activeSession?.lotteryMode
+    || (participants.some((p) => Boolean(p.instagramUsername)) ? 'instagram' : (settings.lotteryMode || 'personnel'));
 
   return (
     <div
@@ -780,6 +798,7 @@ export default function App() {
             prizeItemName={activeSession?.prizeItemName || settings.prizeItemName}
             showExcelRow={effectiveShowExcelRow}
             showPersonnelCode={effectiveShowPersonnelCode}
+            lotteryMode={effectiveLotteryMode}
             disabled={participants.length === 0}
             maxWinnersCount={activeSession?.maxWinnersCount}
             currentWinnersCount={winners.length}
@@ -840,6 +859,7 @@ export default function App() {
         prizeItemName={activeSession?.prizeItemName || settings.prizeItemName}
         showExcelRow={effectiveShowExcelRow}
         showPersonnelCode={effectiveShowPersonnelCode}
+        lotteryMode={effectiveLotteryMode}
         onConfirmWinner={handleConfirmWinner}
         onDiscardAndRedraw={handleDiscardAndRedraw}
       />
@@ -864,6 +884,7 @@ export default function App() {
         onClose={() => setIsExcelModalOpen(false)}
         onLoadParticipants={handleLoadNewParticipants}
         currentCount={participants.length}
+        initialMode={effectiveLotteryMode}
       />
 
       {/* Winners List Drawer / Modal */}

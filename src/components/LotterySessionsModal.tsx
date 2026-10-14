@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LotterySession, Winner, Participant } from '../types';
+import { LotterySession, Winner, Participant, LotteryMode } from '../types';
 import { formatLoanAmount } from '../utils/format';
-import { exportWinnersToExcel, parseParticipantsExcel, getDemoParticipants } from '../utils/excel';
+import {
+  exportWinnersToExcel,
+  parseParticipantsExcel,
+  getDemoParticipants,
+  getInstagramDemoParticipants,
+  generateSampleExcelFile,
+  generateInstagramSampleExcelFile,
+} from '../utils/excel';
 import { JalaliDatePicker } from './JalaliDatePicker';
 import {
   Trophy,
@@ -30,6 +37,8 @@ import {
   Eye,
   EyeOff,
   Hash,
+  AtSign,
+  Briefcase,
 } from 'lucide-react';
 
 export interface CreateLotterySessionInput {
@@ -44,6 +53,7 @@ export interface CreateLotterySessionInput {
   prizeItemName?: string;
   showExcelRow?: boolean;
   showPersonnelCode?: boolean;
+  lotteryMode?: LotteryMode;
 }
 
 interface LotterySessionsModalProps {
@@ -87,11 +97,13 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
   const [editPrizeItemName, setEditPrizeItemName] = useState('');
   const [editShowExcelRow, setEditShowExcelRow] = useState(true);
   const [editShowPersonnelCode, setEditShowPersonnelCode] = useState(true);
+  const [editLotteryMode, setEditLotteryMode] = useState<LotteryMode>('personnel');
 
   // Safe delete confirmation state
   const [sessionToDelete, setSessionToDelete] = useState<LotterySession | null>(null);
 
   // Form states for creating a new lottery
+  const [lotteryMode, setLotteryMode] = useState<LotteryMode>('personnel');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(() => {
     try {
@@ -147,13 +159,16 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
     setExcelError(null);
 
     try {
-      const report = await parseParticipantsExcel(file);
+      const report = await parseParticipantsExcel(file, lotteryMode);
       if (report.parsedParticipants.length === 0) {
         setExcelError('هیچ شرکت‌کننده معتبری در فایل یافت نشد.');
         return;
       }
       setUploadedParticipants(report.parsedParticipants);
       setExcelFileName(file.name);
+      if (report.detectedMode) {
+        setLotteryMode(report.detectedMode);
+      }
     } catch (err: unknown) {
       setExcelError((err as Error)?.message || 'خطا در پردازش و استخراج فایل اکسل.');
     } finally {
@@ -173,9 +188,15 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
     setIsParsingExcel(true);
     setExcelError(null);
     setTimeout(() => {
-      const demo = getDemoParticipants(459);
-      setUploadedParticipants(demo);
-      setExcelFileName('لیست_پیشفرض_۴۵۹_نفره_پرسنل.xlsx');
+      if (lotteryMode === 'instagram') {
+        const demo = getInstagramDemoParticipants(300);
+        setUploadedParticipants(demo);
+        setExcelFileName('لیست_پیشفرض_۳۰۰_آیدی_اینستاگرام.xlsx');
+      } else {
+        const demo = getDemoParticipants(459);
+        setUploadedParticipants(demo);
+        setExcelFileName('لیست_پیشفرض_۴۵۹_نفره_پرسنل.xlsx');
+      }
       setIsParsingExcel(false);
     }, 200);
   };
@@ -200,14 +221,22 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
 
     // If no excel uploaded, ask user to either upload or use default
     if (finalParticipants.length === 0) {
-      const proceedWithDefault = confirm(
-        'هنوز فایل اکسل شرکت‌کنندگان بارگذاری نشده است.\nآیا مایلید از لیست پیش‌فرض ۴۵۹ نفره آزمایشی پرسنل استفاده شود؟\n(در صورت انتخاب انصراف، لطفاً فایل اکسل خود را بارگذاری کنید)'
-      );
+      const isInsta = lotteryMode === 'instagram';
+      const promptText = isInsta
+        ? 'هنوز فایل اکسل شرکت‌کنندگان بارگذاری نشده است.\nآیا مایلید از لیست پیش‌فرض ۳۰۰ آیدی آزمایشی اینستاگرام استفاده شود؟\n(در صورت انتخاب انصراف، لطفاً فایل اکسل تک‌ستونه خود را بارگذاری کنید)'
+        : 'هنوز فایل اکسل شرکت‌کنندگان بارگذاری نشده است.\nآیا مایلید از لیست پیش‌فرض ۴۵۹ نفره آزمایشی پرسنل استفاده شود؟\n(در صورت انتخاب انصراف، لطفاً فایل اکسل خود را بارگذاری کنید)';
+
+      const proceedWithDefault = confirm(promptText);
       if (!proceedWithDefault) {
         return;
       }
-      finalParticipants = getDemoParticipants(459);
-      finalFileName = 'لیست_پیشفرض_۴۵۹_نفره_پرسنل.xlsx';
+      if (isInsta) {
+        finalParticipants = getInstagramDemoParticipants(300);
+        finalFileName = 'لیست_پیشفرض_۳۰۰_آیدی_اینستاگرام.xlsx';
+      } else {
+        finalParticipants = getDemoParticipants(459);
+        finalFileName = 'لیست_پیشفرض_۴۵۹_نفره_پرسنل.xlsx';
+      }
     }
 
     if (prizeType === 'item' && !prizeItemName.trim()) {
@@ -227,6 +256,7 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
       prizeItemName: prizeType === 'item' ? prizeItemName.trim() : undefined,
       showExcelRow,
       showPersonnelCode,
+      lotteryMode,
     });
 
     // Reset create form
@@ -236,6 +266,7 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
     setPrizeType('monetary');
     setShowExcelRow(true);
     setShowPersonnelCode(true);
+    setLotteryMode('personnel');
     setUploadedParticipants([]);
     setExcelFileName('');
     setActiveTab('list');
@@ -252,6 +283,7 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
     setEditPrizeItemName(session.prizeItemName || '');
     setEditShowExcelRow(session.showExcelRow !== false);
     setEditShowPersonnelCode(session.showPersonnelCode !== false);
+    setEditLotteryMode(session.lotteryMode || 'personnel');
   };
 
   const handleSaveEdit = (e: React.FormEvent, originalSession: LotterySession) => {
@@ -276,6 +308,7 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
       prizeItemName: editPrizeType === 'item' ? editPrizeItemName.trim() : undefined,
       showExcelRow: editShowExcelRow,
       showPersonnelCode: editShowPersonnelCode,
+      lotteryMode: editLotteryMode,
     };
 
     if (onUpdateSession) {
@@ -432,6 +465,58 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                 </p>
               </div>
 
+              {/* Lottery Mode Selector Card */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">
+                  حالت برگزاری قرعه‌کشی *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setLotteryMode('personnel')}
+                    className={`p-3 rounded-2xl border text-right transition cursor-pointer flex items-start gap-3 ${
+                      lotteryMode === 'personnel'
+                        ? 'bg-amber-500/15 border-amber-400 text-white shadow-md shadow-amber-500/10'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                      lotteryMode === 'personnel' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-white">قرعه‌کشی پرسنلی و سازمانی</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        فایل ۶ ستونه با کد پرسنلی، تلفن همراه و ردیف
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLotteryMode('instagram')}
+                    className={`p-3 rounded-2xl border text-right transition cursor-pointer flex items-start gap-3 ${
+                      lotteryMode === 'instagram'
+                        ? 'bg-purple-950/40 border-pink-400 text-white shadow-md shadow-purple-500/15'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                      lotteryMode === 'instagram' ? 'bg-linear-to-tr from-pink-500 to-purple-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      <AtSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-white">قرعه‌کشی اینستاگرام (تک‌ستونه)</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        فایل اکسل تک‌ستونه حاوی نام‌های کاربری / آیدی‌ها
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* 1. Lottery Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">
@@ -441,7 +526,11 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: قرعه‌کشی وام قرض‌الحسنه رفاهی پرسنل - دوره مهرماه"
+                  placeholder={
+                    lotteryMode === 'instagram'
+                      ? 'مثال: قرعه‌کشی مسابقه اینستاگرامی عیدانه'
+                      : 'مثال: قرعه‌کشی وام قرض‌الحسنه رفاهی پرسنل - دوره مهرماه'
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   required
                 />
@@ -813,16 +902,38 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                   </div>
                 )}
 
-                {/* Quick demo participant option */}
+                {/* Quick demo participant option & template downloader */}
                 {uploadedParticipants.length === 0 && (
-                  <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
-                    <span>فایل اکسل ندارید؟</span>
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (lotteryMode === 'instagram') {
+                          generateInstagramSampleExcelFile(300);
+                        } else {
+                          generateSampleExcelFile(459);
+                        }
+                      }}
+                      className="text-slate-400 hover:text-white hover:underline transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>
+                        {lotteryMode === 'instagram'
+                          ? 'دانلود قالب نمونه اکسل اینستاگرام (تک‌ستونه)'
+                          : 'دانلود قالب استاندارد سازمانی (۴۵۹ نفر)'}
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={handleLoadDemoParticipants}
-                      className="text-amber-400 hover:text-amber-300 hover:underline transition cursor-pointer font-bold"
+                      className="text-amber-400 hover:text-amber-300 hover:underline transition cursor-pointer font-bold flex items-center gap-1.5"
                     >
-                      استفاده از لیست پیش‌فرض ۴۵۹ نفره آزمایشی
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>
+                        {lotteryMode === 'instagram'
+                          ? 'بارگذاری سریع ۳۰۰ آیدی آزمایشی اینستاگرام'
+                          : 'استفاده از لیست پیش‌فرض ۴۵۹ نفره سازمانی'}
+                      </span>
                     </button>
                   </div>
                 )}
@@ -1066,23 +1177,50 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-800/80 max-h-96 overflow-y-auto">
-                      <div className="sticky top-0 bg-slate-900 grid grid-cols-12 gap-2 p-3 text-xs font-bold text-slate-300 border-b border-slate-800">
-                        <span className="col-span-2 text-center">ردیف</span>
-                        <span className="col-span-4">نام و نام خانوادگی</span>
-                        <span className="col-span-3 text-center">کد پرسنلی</span>
-                        <span className="col-span-3 text-center">تلفن همراه</span>
-                      </div>
-                      {filteredParticipants.map((p, idx) => (
-                        <div
-                          key={p.id}
-                          className="grid grid-cols-12 gap-2 p-2.5 text-xs text-slate-300 items-center hover:bg-slate-800/30 transition"
-                        >
-                          <span className="col-span-2 text-center font-mono text-slate-400">{p.rowNumber || idx + 1}</span>
-                          <span className="col-span-4 font-bold text-white truncate">{p.fullName}</span>
-                          <span className="col-span-3 text-center font-mono text-slate-300">{p.personnelCode}</span>
-                          <span className="col-span-3 text-center font-mono text-slate-300">{p.mobile}</span>
-                        </div>
-                      ))}
+                      {selectedSessionForDetails.lotteryMode === 'instagram' ? (
+                        <>
+                          <div className="sticky top-0 bg-slate-900 grid grid-cols-12 gap-2 p-3 text-xs font-bold text-pink-300 border-b border-slate-800">
+                            <span className="col-span-2 text-center">ردیف</span>
+                            <span className="col-span-8">نام کاربری / آیدی اینستاگرام</span>
+                            <span className="col-span-2 text-center">وضعیت</span>
+                          </div>
+                          {filteredParticipants.map((p, idx) => (
+                            <div
+                              key={p.id}
+                              className="grid grid-cols-12 gap-2 p-2.5 text-xs text-slate-300 items-center hover:bg-slate-800/30 transition"
+                            >
+                              <span className="col-span-2 text-center font-mono text-slate-400">{p.rowNumber || idx + 1}</span>
+                              <div className="col-span-8 flex items-center gap-1.5 truncate">
+                                <AtSign className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                                <span className="font-mono font-bold text-white truncate">{p.fullName}</span>
+                              </div>
+                              <span className="col-span-2 text-center text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                مجاز
+                              </span>
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          <div className="sticky top-0 bg-slate-900 grid grid-cols-12 gap-2 p-3 text-xs font-bold text-slate-300 border-b border-slate-800">
+                            <span className="col-span-2 text-center">ردیف</span>
+                            <span className="col-span-4">نام و نام خانوادگی</span>
+                            <span className="col-span-3 text-center">کد پرسنلی</span>
+                            <span className="col-span-3 text-center">تلفن همراه</span>
+                          </div>
+                          {filteredParticipants.map((p, idx) => (
+                            <div
+                              key={p.id}
+                              className="grid grid-cols-12 gap-2 p-2.5 text-xs text-slate-300 items-center hover:bg-slate-800/30 transition"
+                            >
+                              <span className="col-span-2 text-center font-mono text-slate-400">{p.rowNumber || idx + 1}</span>
+                              <span className="col-span-4 font-bold text-white truncate">{p.fullName}</span>
+                              <span className="col-span-3 text-center font-mono text-slate-300">{p.personnelCode}</span>
+                              <span className="col-span-3 text-center font-mono text-slate-300">{p.mobile}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1373,7 +1511,17 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                         <>
                           <div className="space-y-1.5 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-base font-black text-white">{s.title}</h4>
+                              {s.lotteryMode === 'instagram' ? (
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-linear-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/40 flex items-center gap-1">
+                                  <AtSign className="w-3 h-3 text-pink-400" />
+                                  <span>اینستاگرام</span>
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                  <Briefcase className="w-3 h-3 text-amber-400" />
+                                  <span>سازمانی</span>
+                                </span>
+                              )}
                               {isActive && (
                                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
                                   ● در حال اجرا روی گردونه

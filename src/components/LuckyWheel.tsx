@@ -3,7 +3,8 @@ import { Participant, Winner } from '../types';
 import { sound } from '../utils/audio';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
 import { pickSecureWinner } from '../utils/lotteryAlgorithm';
-import { Play, Volume2, VolumeX, Shuffle, Eye, EyeOff, CheckCircle2, Trophy, AlertTriangle, ShieldCheck, Award, Gift, Coins } from 'lucide-react';
+import { Play, Volume2, VolumeX, Shuffle, Eye, EyeOff, CheckCircle2, Trophy, AlertTriangle, ShieldCheck, Award, Gift, Coins, AtSign } from 'lucide-react';
+import { LotteryMode } from '../types';
 
 interface LuckyWheelProps {
   participants: Participant[];
@@ -23,6 +24,7 @@ interface LuckyWheelProps {
   prizeItemName?: string;
   showExcelRow?: boolean;
   showPersonnelCode?: boolean;
+  lotteryMode?: LotteryMode;
   disabled?: boolean;
   maxWinnersCount?: number;
   currentWinnersCount?: number;
@@ -67,6 +69,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   prizeItemName,
   showExcelRow = true,
   showPersonnelCode = true,
+  lotteryMode = 'personnel',
   disabled = false,
   maxWinnersCount,
   currentWinnersCount = 0,
@@ -492,23 +495,42 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                   </div>
 
                   {/* Name display container with generous height, vertical padding and relaxed line-height so descenders (ی، ر، ز، ن) are never cut */}
-                  <div className={`flex items-center justify-center w-full shrink-0 overflow-visible py-2 ${
+                  {/* Center Name / Instagram Handle */}
+                  <div className={`flex items-center justify-center w-full shrink-0 overflow-visible py-1.5 ${
                     isFullscreen ? 'h-24 sm:h-28' : 'h-18 sm:h-20'
                   }`}>
-                    <span
-                      title={displayedPerson.fullName}
-                      className={`font-black text-transparent bg-clip-text bg-linear-to-r from-amber-100 via-amber-300 to-yellow-200 drop-shadow-[0_4px_16px_rgba(251,191,36,0.45)] whitespace-nowrap text-ellipsis max-w-full text-center px-3 py-1.5 leading-normal ${
-                        isFullscreen
-                          ? 'text-3xl sm:text-5xl md:text-6xl tracking-wide'
-                          : 'text-2xl sm:text-3xl md:text-4xl'
-                      }`}
-                    >
-                      {displayedPerson.fullName}
-                    </span>
+                    {(lotteryMode === 'instagram' || displayedPerson.instagramUsername) ? (
+                      <div className="flex items-center justify-center gap-2 max-w-full px-2">
+                        <span className="p-1 sm:p-1.5 rounded-xl bg-linear-to-tr from-amber-500 via-pink-500 to-purple-600 text-white shadow-md shadow-pink-500/20 shrink-0">
+                          <AtSign className={isFullscreen ? 'w-5 h-5' : 'w-4 h-4'} />
+                        </span>
+                        <span
+                          title={displayedPerson.fullName}
+                          className={`font-black text-transparent bg-clip-text bg-linear-to-r from-amber-100 via-yellow-200 to-amber-300 drop-shadow-[0_4px_16px_rgba(251,191,36,0.45)] whitespace-nowrap text-ellipsis overflow-hidden font-mono text-left direction-ltr ${
+                            isFullscreen
+                              ? 'text-3xl sm:text-5xl md:text-6xl tracking-wide'
+                              : 'text-2xl sm:text-3xl md:text-4xl'
+                          }`}
+                        >
+                          {displayedPerson.fullName}
+                        </span>
+                      </div>
+                    ) : (
+                      <span
+                        title={displayedPerson.fullName}
+                        className={`font-black text-transparent bg-clip-text bg-linear-to-r from-amber-100 via-amber-300 to-yellow-200 drop-shadow-[0_4px_16px_rgba(251,191,36,0.45)] whitespace-nowrap text-ellipsis max-w-full text-center px-3 py-1.5 leading-normal ${
+                          isFullscreen
+                            ? 'text-3xl sm:text-5xl md:text-6xl tracking-wide'
+                            : 'text-2xl sm:text-3xl md:text-4xl'
+                        }`}
+                      >
+                        {displayedPerson.fullName}
+                      </span>
+                    )}
                   </div>
 
                   {/* Badges container with fixed height */}
-                  {(showExcelRow !== false || showPersonnelCode !== false) && (
+                  {(showExcelRow !== false || (showPersonnelCode !== false && lotteryMode !== 'instagram' && !displayedPerson.instagramUsername && displayedPerson.personnelCode !== '---')) && (
                     <div className="h-8 flex flex-wrap items-center justify-center gap-2 mt-1 shrink-0">
                       {showExcelRow !== false && (
                         <span className={`text-amber-300 bg-amber-500/25 px-3 py-0.5 rounded-full border border-amber-400/60 font-bold font-mono whitespace-nowrap ${
@@ -517,11 +539,19 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                           ردیف اکسل: {displayedPerson.rowNumber}
                         </span>
                       )}
-                      {showPersonnelCode !== false && (
+                      {showPersonnelCode !== false && lotteryMode !== 'instagram' && !displayedPerson.instagramUsername && displayedPerson.personnelCode !== '---' && (
                         <span className={`text-amber-200 bg-slate-800 px-3 py-0.5 rounded-full border border-slate-700 font-mono whitespace-nowrap ${
                           isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
                         }`}>
                           کد پرسنلی: {displayedPerson.personnelCode}
+                        </span>
+                      )}
+                      {(lotteryMode === 'instagram' || displayedPerson.instagramUsername) && (
+                        <span className={`text-pink-300 bg-pink-500/20 px-3 py-0.5 rounded-full border border-pink-500/40 font-bold whitespace-nowrap flex items-center gap-1 ${
+                          isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+                        }`}>
+                          <AtSign className="w-3 h-3 text-pink-400" />
+                          <span>قرعه‌کشی اینستاگرام</span>
                         </span>
                       )}
                     </div>

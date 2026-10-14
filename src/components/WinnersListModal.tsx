@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Winner } from '../types';
 import { exportWinnersToExcel } from '../utils/excel';
-import { Trophy, Download, Trash2, RotateCcw, X, Search, Award, Gift } from 'lucide-react';
+import { Trophy, Download, Trash2, RotateCcw, X, Search, Award, Gift, AtSign } from 'lucide-react';
 
 interface WinnersListModalProps {
   isOpen: boolean;
@@ -133,13 +133,24 @@ export const WinnersListModal: React.FC<WinnersListModalProps> = ({
                     {w.winnerRankTitle || `برنده ${w.drawRound}`}
                   </span>
                   <div className={`${showPersonnelCode !== false ? 'col-span-4' : 'col-span-6'} flex flex-col`}>
-                    <span className="font-bold text-white truncate">{w.fullName}</span>
+                    <div className="flex items-center gap-1.5 truncate">
+                      {(w.lotteryMode === 'instagram' || w.instagramUsername) && (
+                        <span className="p-0.5 rounded bg-linear-to-tr from-pink-500 to-purple-600 text-white shrink-0">
+                          <AtSign className="w-3 h-3" />
+                        </span>
+                      )}
+                      <span className="font-bold text-white truncate font-mono">{w.fullName}</span>
+                    </div>
                     <span className="text-[11px] text-slate-400 font-mono">
-                      {showExcelRow !== false ? `ردیف ${w.rowNumber} • ` : ''}{w.mobile}
+                      {showExcelRow !== false ? `ردیف ${w.rowNumber}` : ''}
+                      {w.mobile && w.mobile !== '---' ? ` • ${w.mobile}` : ''}
+                      {(w.lotteryMode === 'instagram' || w.instagramUsername) ? ' • اینستاگرام' : ''}
                     </span>
                   </div>
                   {showPersonnelCode !== false && (
-                    <span className="col-span-2 font-mono text-slate-300">{w.personnelCode}</span>
+                    <span className="col-span-2 font-mono text-slate-300">
+                      {w.lotteryMode === 'instagram' || w.instagramUsername ? '---' : w.personnelCode}
+                    </span>
                   )}
                   <div className="col-span-2 flex flex-col">
                     <span className="text-amber-200 truncate flex items-center gap-1 font-medium">

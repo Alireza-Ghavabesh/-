@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppSettings, Winner, AdminUser } from '../types';
+import { AppSettings, Winner, AdminUser, LotteryMode } from '../types';
 import { sound } from '../utils/audio';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
 import {
@@ -21,6 +21,8 @@ import {
   Coins,
   Gift,
   Hash,
+  AtSign,
+  Briefcase,
 } from 'lucide-react';
 
 interface StageHeaderProps {

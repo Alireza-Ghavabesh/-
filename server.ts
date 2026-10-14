@@ -74,7 +74,9 @@ async function initDatabase() {
       created_at TEXT,
       prize_type TEXT DEFAULT 'monetary',
       prize_label TEXT DEFAULT 'وام',
-      prize_item_name TEXT
+      prize_item_name TEXT,
+      instagram_username TEXT,
+      lottery_mode TEXT DEFAULT 'personnel'
     );
 
     CREATE TABLE IF NOT EXISTS participants (
@@ -85,7 +87,8 @@ async function initDatabase() {
       mobile TEXT,
       credit_deferred TEXT,
       charge_credit TEXT,
-      original_row_index INTEGER
+      original_row_index INTEGER,
+      instagram_username TEXT
     );
 
     CREATE TABLE IF NOT EXISTS custom_backgrounds (
@@ -118,7 +121,8 @@ async function initDatabase() {
       prize_label TEXT DEFAULT 'وام',
       prize_item_name TEXT,
       show_excel_row INTEGER DEFAULT 1,
-      show_personnel_code INTEGER DEFAULT 1
+      show_personnel_code INTEGER DEFAULT 1,
+      lottery_mode TEXT DEFAULT 'personnel'
     );
 
     CREATE TABLE IF NOT EXISTS admins (
@@ -195,6 +199,26 @@ async function initDatabase() {
   }
   try {
     db.run('ALTER TABLE winners ADD COLUMN prize_item_name TEXT');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN lottery_mode TEXT DEFAULT "personnel"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE winners ADD COLUMN instagram_username TEXT');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE winners ADD COLUMN lottery_mode TEXT DEFAULT "personnel"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE participants ADD COLUMN instagram_username TEXT');
   } catch {
     // column already exists
   }
@@ -807,6 +831,8 @@ async function startServer() {
         prizeType: (r.prize_type as 'monetary' | 'item') || 'monetary',
         prizeLabel: r.prize_label ? String(r.prize_label) : 'وام',
         prizeItemName: r.prize_item_name ? String(r.prize_item_name) : undefined,
+        instagramUsername: r.instagram_username ? String(r.instagram_username) : undefined,
+        lotteryMode: (r.lottery_mode as 'personnel' | 'instagram') || 'personnel',
       }));
       res.json({ success: true, winners });
     } catch (err: unknown) {
@@ -825,8 +851,8 @@ async function startServer() {
 
       db.run(
         `INSERT OR REPLACE INTO winners 
-        (id, draw_round, winner_rank_title, prize_title, full_name, personnel_code, mobile, row_number, loan_amount, loan_words, credit_deferred, charge_credit, won_at, created_at, prize_type, prize_label, prize_item_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, draw_round, winner_rank_title, prize_title, full_name, personnel_code, mobile, row_number, loan_amount, loan_words, credit_deferred, charge_credit, won_at, created_at, prize_type, prize_label, prize_item_name, instagram_username, lottery_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(w.id),
           Number(w.drawRound || 1),
@@ -845,6 +871,8 @@ async function startServer() {
           String(w.prizeType || 'monetary'),
           String(w.prizeLabel || 'وام'),
           w.prizeItemName ? String(w.prizeItemName) : null,
+          w.instagramUsername ? String(w.instagramUsername) : null,
+          String(w.lotteryMode || 'personnel'),
         ]
       );
 
@@ -894,6 +922,7 @@ async function startServer() {
         creditDeferred: String(r.credit_deferred || ''),
         chargeCredit: String(r.charge_credit || ''),
         originalRowIndex: Number(r.original_row_index || 0),
+        instagramUsername: r.instagram_username ? String(r.instagram_username) : undefined,
       }));
       res.json({ success: true, participants });
     } catch (err: unknown) {
@@ -917,8 +946,8 @@ async function startServer() {
 
       for (const p of participants) {
         db.run(
-          `INSERT INTO participants (id, row_number, full_name, personnel_code, mobile, credit_deferred, charge_credit, original_row_index)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO participants (id, row_number, full_name, personnel_code, mobile, credit_deferred, charge_credit, original_row_index, instagram_username)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             String(p.id),
             String(p.rowNumber || ''),
@@ -928,6 +957,7 @@ async function startServer() {
             String(p.creditDeferred || ''),
             String(p.chargeCredit || ''),
             Number(p.originalRowIndex || 0),
+            p.instagramUsername ? String(p.instagramUsername) : null,
           ]
         );
       }
@@ -1088,6 +1118,7 @@ async function startServer() {
           prizeItemName: r.prize_item_name ? String(r.prize_item_name) : undefined,
           showExcelRow: r.show_excel_row !== undefined ? (Number(r.show_excel_row) === 1 || r.show_excel_row === true || r.show_excel_row === '1') : true,
           showPersonnelCode: r.show_personnel_code !== undefined ? (Number(r.show_personnel_code) === 1 || r.show_personnel_code === true || r.show_personnel_code === '1') : true,
+          lotteryMode: (r.lottery_mode as 'personnel' | 'instagram') || 'personnel',
         };
       });
       res.json({ success: true, sessions });
@@ -1107,8 +1138,8 @@ async function startServer() {
 
       db.run(
         `INSERT OR REPLACE INTO lottery_sessions 
-        (id, title, date, loan_amount, max_winners_count, status, total_participants_count, winners_json, participants_json, excel_file_name, created_at, completed_at, prize_type, prize_label, prize_item_name, show_excel_row, show_personnel_code)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, title, date, loan_amount, max_winners_count, status, total_participants_count, winners_json, participants_json, excel_file_name, created_at, completed_at, prize_type, prize_label, prize_item_name, show_excel_row, show_personnel_code, lottery_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(session.id),
           String(session.title || ''),
@@ -1127,6 +1158,7 @@ async function startServer() {
           session.prizeItemName ? String(session.prizeItemName) : null,
           session.showExcelRow === false ? 0 : 1,
           session.showPersonnelCode === false ? 0 : 1,
+          String(session.lotteryMode || 'personnel'),
         ]
       );
 

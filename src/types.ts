@@ -1,9 +1,12 @@
+export type LotteryMode = 'personnel' | 'instagram';
+
 export interface Participant {
   id: string; // unique ID
   rowNumber: number | string; // ردیف
-  fullName: string; // نام و نام خانوادگی
-  personnelCode: string; // کد پرسنلی
-  mobile: string; // تلفن همراه
+  fullName: string; // نام و نام خانوادگی یا آیدی اینستاگرام
+  personnelCode: string; // کد پرسنلی (در قرعه‌کشی اینستاگرام ---)
+  mobile: string; // تلفن همراه (در قرعه‌کشی اینستاگرام ---)
+  instagramUsername?: string; // آیدی اینستاگرام (مثلاً @username)
   employmentDate?: string; // تاریخ استخدام حکم کارگزینی
   chargeCredit?: string | number;
   creditDeferred?: string | number; // مبلغ وام (ریال)
@@ -20,6 +23,7 @@ export interface Winner extends Participant {
   prizeType?: 'monetary' | 'item'; // نوع جایزه (مبلغی/نقدی یا غیرنقدی/کالایی)
   prizeLabel?: string; // برچسب جایزه نقدی (مثلا وام، تسهیلات، سکه، پاداش نقدی)
   prizeItemName?: string; // عنوان جایزه غیرنقدی (مثلا سفر حج عمره، یک دستگاه خودرو)
+  lotteryMode?: LotteryMode; // حالت قرعه‌کشی (سازمانی یا اینستاگرامی)
 }
 
 export interface LotterySession {
@@ -40,6 +44,7 @@ export interface LotterySession {
   prizeItemName?: string; // عنوان جایزه کالایی/غیرنقدی (مثلا سفر حج، خودرو)
   showExcelRow?: boolean; // نمایش ردیف اکسل در استیج و پنجره برنده
   showPersonnelCode?: boolean; // نمایش کد پرسنلی در استیج و پنجره برنده
+  lotteryMode?: LotteryMode; // حالت قرعه‌کشی: سازمانی یا اینستاگرامی
 }
 
 export interface CustomBackground {
@@ -58,6 +63,7 @@ export interface ExcelParseReport {
   excludedLastRowIndex: number;
   parsedParticipants: Participant[];
   ignoredFooterRowText?: string;
+  detectedMode?: LotteryMode;
 }
 
 export type ThemePreset = 'royal-gold' | 'midnight-stage' | 'emerald-gala' | 'neon-festive';
@@ -106,6 +112,7 @@ export interface AppSettings {
   // Display Options for Stage & Winner Modal
   showExcelRow?: boolean; // نمایش ردیف اکسل در استیج و پنجره برنده
   showPersonnelCode?: boolean; // نمایش کد پرسنلی در استیج و پنجره برنده
+  lotteryMode?: LotteryMode; // حالت قرعه‌کشی: سازمانی یا اینستاگرامی
   // Login Screen Customization
   loginHeaderTitle: string; // "ورود به پنل مدیریت"
   loginSubTitle: string; // "سامانه قرعه‌کشی و اعطای تسهیلات"
