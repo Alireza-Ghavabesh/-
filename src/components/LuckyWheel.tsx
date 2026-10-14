@@ -3,7 +3,7 @@ import { Participant, Winner } from '../types';
 import { sound } from '../utils/audio';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
 import { pickSecureWinner } from '../utils/lotteryAlgorithm';
-import { Play, Volume2, VolumeX, Shuffle, Eye, EyeOff, CheckCircle2, Trophy, AlertTriangle, ShieldCheck, Award } from 'lucide-react';
+import { Play, Volume2, VolumeX, Shuffle, Eye, EyeOff, CheckCircle2, Trophy, AlertTriangle, ShieldCheck, Award, Gift, Coins } from 'lucide-react';
 
 interface LuckyWheelProps {
   participants: Participant[];
@@ -18,6 +18,11 @@ interface LuckyWheelProps {
   prizeTitle: string;
   loanAmount?: string;
   useSettingsLoanAmount?: boolean;
+  prizeType?: 'monetary' | 'item';
+  prizeLabel?: string;
+  prizeItemName?: string;
+  showExcelRow?: boolean;
+  showPersonnelCode?: boolean;
   disabled?: boolean;
   maxWinnersCount?: number;
   currentWinnersCount?: number;
@@ -57,6 +62,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
   prizeTitle,
   loanAmount,
   useSettingsLoanAmount = true,
+  prizeType = 'monetary',
+  prizeLabel = 'وام',
+  prizeItemName,
+  showExcelRow = true,
+  showPersonnelCode = true,
   disabled = false,
   maxWinnersCount,
   currentWinnersCount = 0,
@@ -498,22 +508,36 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                   </div>
 
                   {/* Badges container with fixed height */}
-                  <div className="h-8 flex flex-wrap items-center justify-center gap-2 mt-1 shrink-0">
-                    <span className={`text-amber-300 bg-amber-500/25 px-3 py-0.5 rounded-full border border-amber-400/60 font-bold font-mono whitespace-nowrap ${
-                      isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
-                    }`}>
-                      ردیف اکسل: {displayedPerson.rowNumber}
-                    </span>
-                    <span className={`text-amber-200 bg-slate-800 px-3 py-0.5 rounded-full border border-slate-700 font-mono whitespace-nowrap ${
-                      isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
-                    }`}>
-                      کد پرسنلی: {displayedPerson.personnelCode}
-                    </span>
-                  </div>
+                  {(showExcelRow !== false || showPersonnelCode !== false) && (
+                    <div className="h-8 flex flex-wrap items-center justify-center gap-2 mt-1 shrink-0">
+                      {showExcelRow !== false && (
+                        <span className={`text-amber-300 bg-amber-500/25 px-3 py-0.5 rounded-full border border-amber-400/60 font-bold font-mono whitespace-nowrap ${
+                          isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+                        }`}>
+                          ردیف اکسل: {displayedPerson.rowNumber}
+                        </span>
+                      )}
+                      {showPersonnelCode !== false && (
+                        <span className={`text-amber-200 bg-slate-800 px-3 py-0.5 rounded-full border border-slate-700 font-mono whitespace-nowrap ${
+                          isFullscreen ? 'text-xs sm:text-sm' : 'text-xs'
+                        }`}>
+                          کد پرسنلی: {displayedPerson.personnelCode}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Loan Amount badge with fixed height slot to prevent layout jumps */}
+                  {/* Prize / Loan Amount badge with fixed height slot to prevent layout jumps */}
                   <div className="h-7 flex items-center justify-center mt-1 shrink-0">
-                    {(() => {
+                    {prizeType === 'item' ? (
+                      <div className={`font-bold text-amber-200 flex items-center gap-1.5 bg-amber-950/60 rounded-full border border-amber-500/60 shadow-sm whitespace-nowrap ${
+                        isFullscreen ? 'text-xs sm:text-sm px-3.5 py-0.5' : 'text-[11px] px-2.5 py-0.5'
+                      }`}>
+                        <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="text-amber-400 font-sans font-medium text-[10px]">{prizeLabel || 'جایزه'}:</span>
+                        <span className="text-white font-bold">{prizeItemName || prizeTitle || 'جایزه ویژه'}</span>
+                      </div>
+                    ) : (() => {
                       const effectiveAmount = (useSettingsLoanAmount || !displayedPerson.creditDeferred)
                         ? (loanAmount || displayedPerson.creditDeferred)
                         : displayedPerson.creditDeferred;
@@ -522,7 +546,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({
                         <div className={`font-bold text-amber-300 flex items-center gap-1.5 font-mono bg-amber-950/40 rounded-full border border-amber-500/40 whitespace-nowrap ${
                           isFullscreen ? 'text-xs sm:text-sm px-3.5 py-0.5' : 'text-[11px] px-2.5 py-0.5'
                         }`}>
-                          <span className="text-amber-400 font-sans font-medium text-[10px]">وام:</span>
+                          <Coins className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className="text-amber-400 font-sans font-medium text-[10px]">{prizeLabel || 'وام'}:</span>
                           <span>{formatLoanAmount(effectiveAmount).numeric}</span>
                         </div>
                       );

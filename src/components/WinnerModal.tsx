@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Participant, Winner } from '../types';
 import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
-import { Trophy, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff } from 'lucide-react';
+import { Trophy, CheckCircle2, RotateCcw, Award, User, Phone, Coins, Hash, Eye, EyeOff, Gift } from 'lucide-react';
 
 interface WinnerModalProps {
   winner: Participant | null;
@@ -11,6 +11,11 @@ interface WinnerModalProps {
   maskMobile: boolean;
   loanAmount?: string;
   useSettingsLoanAmount?: boolean;
+  prizeType?: 'monetary' | 'item';
+  prizeLabel?: string;
+  prizeItemName?: string;
+  showExcelRow?: boolean;
+  showPersonnelCode?: boolean;
   onConfirmWinner: (confirmedWinner: Winner) => void;
   onDiscardAndRedraw: () => void;
 }
@@ -22,6 +27,11 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   maskMobile: initialMaskMobile,
   loanAmount,
   useSettingsLoanAmount = true,
+  prizeType = 'monetary',
+  prizeLabel = 'وام',
+  prizeItemName,
+  showExcelRow = true,
+  showPersonnelCode = true,
   onConfirmWinner,
   onDiscardAndRedraw,
 }) => {
@@ -67,14 +77,22 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   if (!winner) return null;
 
   const handleConfirm = () => {
+    const isItem = prizeType === 'item';
+    const displayPrizeTitle = isItem
+      ? (prizeItemName || prizeTitle || winnerRankTitle)
+      : (prizeTitle || winnerRankTitle);
+
     const winnerRecord: Winner = {
       ...winner,
       wonAt: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       drawRound,
       winnerRankTitle,
-      prizeTitle: prizeTitle || winnerRankTitle,
-      loanAmount: loanInfo?.numeric || '۰ ریال',
-      loanWords: loanInfo?.words || '',
+      prizeTitle: displayPrizeTitle,
+      loanAmount: isItem ? '' : (loanInfo?.numeric || '۰ ریال'),
+      loanWords: isItem ? '' : (loanInfo?.words || ''),
+      prizeType: prizeType || 'monetary',
+      prizeLabel: prizeLabel || 'وام',
+      prizeItemName: prizeItemName || (isItem ? displayPrizeTitle : ''),
     };
     onConfirmWinner(winnerRecord);
   };
@@ -107,8 +125,10 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
 
         {/* Stage Titles */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs md:text-sm font-bold mb-2">
-          <Award className="w-4 h-4" />
-          <span>{winnerRankTitle} {prizeTitle ? `• ${prizeTitle}` : ''}</span>
+          {prizeType === 'item' ? <Gift className="w-4 h-4 text-amber-400" /> : <Award className="w-4 h-4" />}
+          <span>
+            {winnerRankTitle} {prizeType === 'item' ? (prizeItemName ? `• ${prizeItemName}` : '') : (prizeTitle ? `• ${prizeTitle}` : '')}
+          </span>
         </div>
 
         <h2 className="text-xl md:text-2xl font-black text-amber-400 mb-1">
@@ -129,40 +149,62 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3 w-full text-right text-xs md:text-sm">
             {/* Personnel Code */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <Hash className="w-4 h-4 text-amber-400" />
-                کد پرسنلی:
-              </span>
-              <span className="font-bold text-white font-mono text-base">{winner.personnelCode}</span>
-            </div>
+            {showPersonnelCode !== false && (
+              <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
+                showExcelRow === false ? 'col-span-2' : ''
+              }`}>
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <Hash className="w-4 h-4 text-amber-400" />
+                  کد پرسنلی:
+                </span>
+                <span className="font-bold text-white font-mono text-base">{winner.personnelCode}</span>
+              </div>
+            )}
 
             {/* Excel Row */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-amber-400" />
-                ردیف اکسل:
-              </span>
-              <span className="font-bold text-white font-mono text-base">{winner.rowNumber}</span>
-            </div>
-
-            {/* Loan Amount (وام) - Exclusively from deferred credit/نسیه, completely ignoring charge credit */}
-            <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
-              <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
-                <Coins className="w-5 h-5 text-amber-400 shrink-0" />
-                <span>وام:</span>
-              </span>
-              <div className="flex flex-col sm:items-end text-right sm:text-left">
-                <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono tracking-wider drop-shadow-md">
-                  {loanInfo?.numeric || '۰ ریال'}
-                </div>
-                {loanInfo?.words && (
-                  <div className="text-xs sm:text-sm font-bold text-amber-100/90 mt-0.5 tracking-normal">
-                    ({loanInfo.words})
-                  </div>
-                )}
+            {showExcelRow !== false && (
+              <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
+                showPersonnelCode === false ? 'col-span-2' : ''
+              }`}>
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-amber-400" />
+                  ردیف اکسل:
+                </span>
+                <span className="font-bold text-white font-mono text-base">{winner.rowNumber}</span>
               </div>
-            </div>
+            )}
+
+            {/* Prize Card: Either Monetary with Custom Label (وام، تسهیلات، سکه) or Non-Monetary Item (سفر حج، خودرو) */}
+            {prizeType === 'item' ? (
+              <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
+                <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
+                  <Gift className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>{prizeLabel || 'جایزه این دور'}:</span>
+                </span>
+                <div className="flex flex-col sm:items-end text-right sm:text-left">
+                  <div className="text-xl sm:text-2xl font-black text-amber-300 drop-shadow-md">
+                    {prizeItemName || prizeTitle || 'جایزه ویژه'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
+                <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
+                  <Coins className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>{prizeLabel || 'وام'}:</span>
+                </span>
+                <div className="flex flex-col sm:items-end text-right sm:text-left">
+                  <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono tracking-wider drop-shadow-md">
+                    {loanInfo?.numeric || '۰ ریال'}
+                  </div>
+                  {loanInfo?.words && (
+                    <div className="text-xs sm:text-sm font-bold text-amber-100/90 mt-0.5 tracking-normal">
+                      ({loanInfo.words})
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

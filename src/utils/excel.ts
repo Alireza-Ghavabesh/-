@@ -230,21 +230,28 @@ export function exportWinnersToExcel(winners: Winner[]): void {
   if (winners.length === 0) return;
 
   const rows: (string | number)[][] = [
-    ['گزارش نهایی برندگان مراسم قرعه‌کشی و گردونه شانس', '', '', '', '', '', '', '', ''],
-    ['رتبه برنده', 'عنوان جایزه', 'ردیف اکسل', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'مبلغ وام (ریال)', 'مبلغ وام به حروف', 'زمان ثبت'],
+    ['گزارش نهایی برندگان مراسم قرعه‌کشی و گردونه شانس', '', '', '', '', '', '', '', '', ''],
+    ['رتبه برنده', 'عنوان / شرح جایزه', 'نوع جایزه', 'ردیف اکسل', 'نام و نام خانوادگی', 'کد پرسنلی', 'تلفن همراه', 'مبلغ / مشخصات جایزه', 'مبلغ به حروف / توضیحات', 'زمان ثبت'],
   ];
 
   winners.forEach((w) => {
+    const isItem = w.prizeType === 'item';
     const loan = formatLoanAmount(w.creditDeferred);
+    const prizeLabelText = w.prizeLabel || (isItem ? 'جایزه غیرنقدی' : 'وام');
+    const prizeTitleText = isItem ? (w.prizeItemName || w.prizeTitle || 'جایزه غیرنقدی') : (w.prizeTitle || prizeLabelText);
+    const amountVal = isItem ? (w.prizeItemName || 'کالایی / غیرنقدی') : (w.loanAmount || loan.numeric);
+    const amountWordsVal = isItem ? 'جایزه غیرنقدی (بدون وجه نقدی)' : (w.loanWords || loan.words);
+
     rows.push([
       w.winnerRankTitle || `برنده ${w.drawRound}`,
-      w.prizeTitle,
+      prizeTitleText,
+      isItem ? 'کالایی / غیرنقدی' : `نقدی (${prizeLabelText})`,
       w.rowNumber,
       w.fullName,
       w.personnelCode,
       w.mobile,
-      w.loanAmount || loan.numeric,
-      w.loanWords || loan.words,
+      amountVal,
+      amountWordsVal,
       w.wonAt,
     ]);
   });
@@ -252,13 +259,14 @@ export function exportWinnersToExcel(winners: Winner[]): void {
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!views'] = [{ rightToLeft: true }];
   ws['!cols'] = [
-    { wch: 10 },
-    { wch: 22 },
+    { wch: 12 },
+    { wch: 25 },
+    { wch: 18 },
     { wch: 10 },
     { wch: 25 },
     { wch: 15 },
     { wch: 18 },
-    { wch: 20 },
+    { wch: 22 },
     { wch: 32 },
     { wch: 16 },
   ];

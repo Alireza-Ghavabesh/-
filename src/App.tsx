@@ -41,6 +41,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   bgImageUrl: null,
   bgDarkness: 30,
   themePreset: 'royal-gold',
+  prizeType: 'monetary',
+  prizeLabel: 'وام',
+  prizeItemName: '',
+  showExcelRow: true,
+  showPersonnelCode: true,
   loginHeaderTitle: 'ورود به پنل مدیریت',
   loginSubTitle: 'سامانه قرعه‌کشی و اعطای تسهیلات',
   loginLogoUrl: null,
@@ -174,6 +179,17 @@ export default function App() {
                 : prev.soundEnabled,
             bgDarkness: dbSettings.bgDarkness ? Number(dbSettings.bgDarkness) : prev.bgDarkness,
             themePreset: (dbSettings.themePreset as any) || prev.themePreset,
+            prizeType: (dbSettings.prizeType as any) || prev.prizeType || 'monetary',
+            prizeLabel: dbSettings.prizeLabel ?? prev.prizeLabel ?? 'وام',
+            prizeItemName: dbSettings.prizeItemName ?? prev.prizeItemName ?? '',
+            showExcelRow:
+              dbSettings.showExcelRow !== undefined
+                ? dbSettings.showExcelRow === 'true' || dbSettings.showExcelRow === '1'
+                : prev.showExcelRow ?? true,
+            showPersonnelCode:
+              dbSettings.showPersonnelCode !== undefined
+                ? dbSettings.showPersonnelCode === 'true' || dbSettings.showPersonnelCode === '1'
+                : prev.showPersonnelCode ?? true,
           };
         });
       }
@@ -244,6 +260,17 @@ export default function App() {
           prizeTitle: dbSettings.prizeTitle ?? prev.prizeTitle,
           loanAmount: dbSettings.loanAmount ?? prev.loanAmount,
           themePreset: (dbSettings.themePreset as any) ?? prev.themePreset,
+          prizeType: (dbSettings.prizeType as any) ?? prev.prizeType,
+          prizeLabel: dbSettings.prizeLabel ?? prev.prizeLabel,
+          prizeItemName: dbSettings.prizeItemName ?? prev.prizeItemName,
+          showExcelRow:
+            dbSettings.showExcelRow !== undefined
+              ? dbSettings.showExcelRow === 'true' || dbSettings.showExcelRow === '1'
+              : prev.showExcelRow ?? true,
+          showPersonnelCode:
+            dbSettings.showPersonnelCode !== undefined
+              ? dbSettings.showPersonnelCode === 'true' || dbSettings.showPersonnelCode === '1'
+              : prev.showPersonnelCode ?? true,
         }));
       }
       if (bgs && bgs.length > 0) {
@@ -346,6 +373,7 @@ export default function App() {
   };
 
   // Create a brand new lottery session with its own participants & Excel file
+  // Create a brand new lottery session with its own participants & Excel file
   const handleCreateSession = (newSessionData: {
     title: string;
     date: string;
@@ -353,6 +381,11 @@ export default function App() {
     maxWinnersCount: number;
     participants: Participant[];
     excelFileName?: string;
+    prizeType?: 'monetary' | 'item';
+    prizeLabel?: string;
+    prizeItemName?: string;
+    showExcelRow?: boolean;
+    showPersonnelCode?: boolean;
   }) => {
     const sessionParticipants = newSessionData.participants && newSessionData.participants.length > 0
       ? newSessionData.participants
@@ -370,6 +403,11 @@ export default function App() {
       excelFileName: newSessionData.excelFileName,
       winners: [],
       createdAt: new Date().toISOString(),
+      prizeType: newSessionData.prizeType || 'monetary',
+      prizeLabel: newSessionData.prizeLabel || 'وام',
+      prizeItemName: newSessionData.prizeItemName,
+      showExcelRow: newSessionData.showExcelRow !== undefined ? newSessionData.showExcelRow : (settings.showExcelRow !== false),
+      showPersonnelCode: newSessionData.showPersonnelCode !== undefined ? newSessionData.showPersonnelCode : (settings.showPersonnelCode !== false),
     };
 
     setSessions((prev) => [newSession, ...prev]);
@@ -379,10 +417,15 @@ export default function App() {
     setWinners([]);
     clearAllWinnersFromDb();
 
-    // Update settings with this lottery's title and loan amount
+    // Update settings with this lottery's title and prize configuration
     updateSettings({
       lotteryTitle: newSession.title,
       loanAmount: newSession.loanAmount,
+      prizeType: newSession.prizeType,
+      prizeLabel: newSession.prizeLabel,
+      prizeItemName: newSession.prizeItemName,
+      showExcelRow: newSession.showExcelRow,
+      showPersonnelCode: newSession.showPersonnelCode,
     });
 
     saveLotterySessionToDb(newSession);
@@ -408,6 +451,11 @@ export default function App() {
     updateSettings({
       lotteryTitle: session.title,
       loanAmount: session.loanAmount,
+      prizeType: session.prizeType || 'monetary',
+      prizeLabel: session.prizeLabel || 'وام',
+      prizeItemName: session.prizeItemName,
+      showExcelRow: session.showExcelRow !== undefined ? session.showExcelRow : settings.showExcelRow,
+      showPersonnelCode: session.showPersonnelCode !== undefined ? session.showPersonnelCode : settings.showPersonnelCode,
     });
   };
 
@@ -428,7 +476,7 @@ export default function App() {
     setIsSessionsModalOpen(true);
   };
 
-  // Update an existing lottery session (title, loan amount, date, max winners, participants)
+  // Update an existing lottery session (title, loan amount, date, max winners, prize, participants)
   const handleUpdateSession = (updatedSession: LotterySession) => {
     setSessions((prev) => prev.map((s) => (s.id === updatedSession.id ? updatedSession : s)));
     if (activeSession?.id === updatedSession.id) {
@@ -441,6 +489,11 @@ export default function App() {
       updateSettings({
         lotteryTitle: updatedSession.title,
         loanAmount: updatedSession.loanAmount,
+        prizeType: updatedSession.prizeType || 'monetary',
+        prizeLabel: updatedSession.prizeLabel || 'وام',
+        prizeItemName: updatedSession.prizeItemName,
+        showExcelRow: updatedSession.showExcelRow,
+        showPersonnelCode: updatedSession.showPersonnelCode,
       });
     }
     saveLotterySessionToDb(updatedSession);
@@ -567,6 +620,15 @@ export default function App() {
     return <AdminLoginScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
   }
 
+  // Display toggles: inherit from activeSession if defined, otherwise from global settings
+  const effectiveShowExcelRow = activeSession?.showExcelRow !== undefined
+    ? activeSession.showExcelRow
+    : (settings.showExcelRow !== false);
+
+  const effectiveShowPersonnelCode = activeSession?.showPersonnelCode !== undefined
+    ? activeSession.showPersonnelCode
+    : (settings.showPersonnelCode !== false);
+
   return (
     <div
       className={`min-h-screen w-full relative flex flex-col justify-between text-slate-100 overflow-x-hidden selection:bg-amber-400 selection:text-slate-950 font-sans ${getThemeBackground()}`}
@@ -615,6 +677,26 @@ export default function App() {
         activeSessionTitle={activeSession?.title}
         activeSessionDate={activeSession?.date}
         activeSessionMaxWinners={activeSession?.maxWinnersCount}
+        activeSessionPrizeType={activeSession?.prizeType || settings.prizeType}
+        activeSessionPrizeLabel={activeSession?.prizeLabel || settings.prizeLabel}
+        activeSessionPrizeItemName={activeSession?.prizeItemName || settings.prizeItemName}
+        activeSessionLoanAmount={activeSession?.prizeType === 'item' ? undefined : (activeSession?.loanAmount || settings.loanAmount)}
+        showExcelRow={effectiveShowExcelRow}
+        showPersonnelCode={effectiveShowPersonnelCode}
+        onToggleExcelRow={() => {
+          const next = !effectiveShowExcelRow;
+          if (activeSession) {
+            handleUpdateSession({ ...activeSession, showExcelRow: next });
+          }
+          updateSettings({ showExcelRow: next });
+        }}
+        onTogglePersonnelCode={() => {
+          const next = !effectiveShowPersonnelCode;
+          if (activeSession) {
+            handleUpdateSession({ ...activeSession, showPersonnelCode: next });
+          }
+          updateSettings({ showPersonnelCode: next });
+        }}
         currentUser={currentUser}
         onOpenAdminManagement={() => setIsAdminModalOpen(true)}
         onLogout={handleLogout}
@@ -690,9 +772,14 @@ export default function App() {
             onSpinEnd={handleSpinEnd}
             spinDurationSeconds={settings.spinDurationSeconds}
             maskMobile={settings.maskMobile}
-            prizeTitle={settings.prizeTitle}
-            loanAmount={settings.loanAmount}
+            prizeTitle={activeSession?.prizeItemName || settings.prizeItemName || settings.prizeTitle}
+            loanAmount={activeSession?.loanAmount || settings.loanAmount}
             useSettingsLoanAmount={settings.useSettingsLoanAmount}
+            prizeType={activeSession?.prizeType || settings.prizeType || 'monetary'}
+            prizeLabel={activeSession?.prizeLabel || settings.prizeLabel || 'وام'}
+            prizeItemName={activeSession?.prizeItemName || settings.prizeItemName}
+            showExcelRow={effectiveShowExcelRow}
+            showPersonnelCode={effectiveShowPersonnelCode}
             disabled={participants.length === 0}
             maxWinnersCount={activeSession?.maxWinnersCount}
             currentWinnersCount={winners.length}
@@ -743,11 +830,16 @@ export default function App() {
       {/* Winner Celebration Modal */}
       <WinnerModal
         winner={pendingWinner}
-        prizeTitle={settings.prizeTitle}
+        prizeTitle={activeSession?.prizeItemName || settings.prizeItemName || settings.prizeTitle}
         drawRound={winners.length + 1}
         maskMobile={settings.maskMobile}
-        loanAmount={settings.loanAmount}
+        loanAmount={activeSession?.loanAmount || settings.loanAmount}
         useSettingsLoanAmount={settings.useSettingsLoanAmount}
+        prizeType={activeSession?.prizeType || settings.prizeType || 'monetary'}
+        prizeLabel={activeSession?.prizeLabel || settings.prizeLabel || 'وام'}
+        prizeItemName={activeSession?.prizeItemName || settings.prizeItemName}
+        showExcelRow={effectiveShowExcelRow}
+        showPersonnelCode={effectiveShowPersonnelCode}
         onConfirmWinner={handleConfirmWinner}
         onDiscardAndRedraw={handleDiscardAndRedraw}
       />
@@ -779,6 +871,8 @@ export default function App() {
         isOpen={isWinnersModalOpen}
         onClose={() => setIsWinnersModalOpen(false)}
         winners={winners}
+        showExcelRow={effectiveShowExcelRow}
+        showPersonnelCode={effectiveShowPersonnelCode}
         onRestoreWinner={handleRestoreWinner}
         onClearAllWinners={handleClearAllWinners}
       />

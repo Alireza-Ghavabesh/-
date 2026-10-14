@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Winner } from '../types';
 import { exportWinnersToExcel } from '../utils/excel';
-import { Trophy, Download, Trash2, RotateCcw, X, Search, Award } from 'lucide-react';
+import { Trophy, Download, Trash2, RotateCcw, X, Search, Award, Gift } from 'lucide-react';
 
 interface WinnersListModalProps {
   isOpen: boolean;
@@ -9,6 +9,8 @@ interface WinnersListModalProps {
   winners: Winner[];
   onRestoreWinner: (winner: Winner) => void;
   onClearAllWinners: () => void;
+  showExcelRow?: boolean;
+  showPersonnelCode?: boolean;
 }
 
 export const WinnersListModal: React.FC<WinnersListModalProps> = ({
@@ -17,6 +19,8 @@ export const WinnersListModal: React.FC<WinnersListModalProps> = ({
   winners,
   onRestoreWinner,
   onClearAllWinners,
+  showExcelRow = true,
+  showPersonnelCode = true,
 }) => {
   const [search, setSearch] = useState('');
 
@@ -115,9 +119,9 @@ export const WinnersListModal: React.FC<WinnersListModalProps> = ({
             <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/50">
               <div className="bg-slate-900/90 grid grid-cols-12 gap-2 p-3 text-xs font-bold text-amber-300">
                 <span className="col-span-2 text-center">رتبه برنده</span>
-                <span className="col-span-4">نام و نام خانوادگی</span>
-                <span className="col-span-2">کد پرسنلی</span>
-                <span className="col-span-2">جایزه</span>
+                <span className={showPersonnelCode !== false ? "col-span-4" : "col-span-6"}>نام و نام خانوادگی</span>
+                {showPersonnelCode !== false && <span className="col-span-2">کد پرسنلی</span>}
+                <span className={showPersonnelCode !== false ? "col-span-2" : "col-span-2"}>جایزه</span>
                 <span className="col-span-2 text-center">عملیات</span>
               </div>
               {filtered.map((w) => (
@@ -128,19 +132,29 @@ export const WinnersListModal: React.FC<WinnersListModalProps> = ({
                   <span className="col-span-2 text-center font-bold text-amber-300 bg-amber-500/15 py-1 px-2 rounded-lg border border-amber-500/30 text-[11px]">
                     {w.winnerRankTitle || `برنده ${w.drawRound}`}
                   </span>
-                  <div className="col-span-4 flex flex-col">
+                  <div className={`${showPersonnelCode !== false ? 'col-span-4' : 'col-span-6'} flex flex-col`}>
                     <span className="font-bold text-white truncate">{w.fullName}</span>
-                    <span className="text-[11px] text-slate-400 font-mono">ردیف {w.rowNumber} • {w.mobile}</span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {showExcelRow !== false ? `ردیف ${w.rowNumber} • ` : ''}{w.mobile}
+                    </span>
                   </div>
-                  <span className="col-span-2 font-mono text-slate-300">{w.personnelCode}</span>
+                  {showPersonnelCode !== false && (
+                    <span className="col-span-2 font-mono text-slate-300">{w.personnelCode}</span>
+                  )}
                   <div className="col-span-2 flex flex-col">
                     <span className="text-amber-200 truncate flex items-center gap-1 font-medium">
-                      <Award className="w-3 h-3 text-amber-400 shrink-0" />
-                      {w.prizeTitle}
+                      {w.prizeType === 'item' ? (
+                        <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      ) : (
+                        <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      )}
+                      <span>{w.prizeItemName || w.prizeTitle}</span>
                     </span>
-                    <span className="text-[11px] font-bold text-amber-300 font-mono">
-                      وام: {w.loanAmount || (w.creditDeferred ? `${w.creditDeferred} ریال` : '---')}
-                    </span>
+                    {w.prizeType !== 'item' && (
+                      <span className="text-[11px] font-bold text-amber-300 font-mono">
+                        {w.prizeLabel || 'وام'}: {w.loanAmount || (w.creditDeferred ? `${w.creditDeferred} ریال` : '---')}
+                      </span>
+                    )}
                     <span className="text-[10px] text-slate-500">{w.wonAt}</span>
                   </div>
                   <div className="col-span-2 flex items-center justify-center">

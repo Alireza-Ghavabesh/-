@@ -17,6 +17,9 @@ export interface Winner extends Participant {
   prizeTitle: string; // عنوان جایزه
   loanAmount?: string; // مبلغ وام (ریال)
   loanWords?: string; // مبلغ وام به حروف
+  prizeType?: 'monetary' | 'item'; // نوع جایزه (مبلغی/نقدی یا غیرنقدی/کالایی)
+  prizeLabel?: string; // برچسب جایزه نقدی (مثلا وام، تسهیلات، سکه، پاداش نقدی)
+  prizeItemName?: string; // عنوان جایزه غیرنقدی (مثلا سفر حج عمره، یک دستگاه خودرو)
 }
 
 export interface LotterySession {
@@ -32,6 +35,11 @@ export interface LotterySession {
   excelFileName?: string; // نام فایل اکسل اختصاصی بارگذاری شده
   createdAt: string;
   completedAt?: string;
+  prizeType?: 'monetary' | 'item'; // نوع جایزه: نقدی/مبلغی یا کالایی/غیرنقدی
+  prizeLabel?: string; // عنوان برچسب جایزه نقدی (پیش‌فرض: وام)
+  prizeItemName?: string; // عنوان جایزه کالایی/غیرنقدی (مثلا سفر حج، خودرو)
+  showExcelRow?: boolean; // نمایش ردیف اکسل در استیج و پنجره برنده
+  showPersonnelCode?: boolean; // نمایش کد پرسنلی در استیج و پنجره برنده
 }
 
 export interface CustomBackground {
@@ -91,6 +99,13 @@ export interface AppSettings {
   bgImageUrl: string | null;
   bgDarkness: number; // 0 to 80%
   themePreset: ThemePreset;
+  // Prize Configuration
+  prizeType?: 'monetary' | 'item'; // 'monetary' | 'item'
+  prizeLabel?: string; // e.g. 'وام', 'تسهیلات', 'سکه', 'پاداش'
+  prizeItemName?: string; // e.g. 'سفر حج عمره', 'یک دستگاه خودرو'
+  // Display Options for Stage & Winner Modal
+  showExcelRow?: boolean; // نمایش ردیف اکسل در استیج و پنجره برنده
+  showPersonnelCode?: boolean; // نمایش کد پرسنلی در استیج و پنجره برنده
   // Login Screen Customization
   loginHeaderTitle: string; // "ورود به پنل مدیریت"
   loginSubTitle: string; // "سامانه قرعه‌کشی و اعطای تسهیلات"

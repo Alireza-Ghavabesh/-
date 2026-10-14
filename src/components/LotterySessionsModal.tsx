@@ -24,6 +24,12 @@ import {
   AlertCircle,
   RefreshCw,
   FileText,
+  Gift,
+  Coins,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Hash,
 } from 'lucide-react';
 
 export interface CreateLotterySessionInput {
@@ -33,6 +39,11 @@ export interface CreateLotterySessionInput {
   maxWinnersCount: number;
   participants: Participant[];
   excelFileName?: string;
+  prizeType?: 'monetary' | 'item';
+  prizeLabel?: string;
+  prizeItemName?: string;
+  showExcelRow?: boolean;
+  showPersonnelCode?: boolean;
 }
 
 interface LotterySessionsModalProps {
@@ -71,6 +82,11 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
   const [editLoanAmount, setEditLoanAmount] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editMaxWinners, setEditMaxWinners] = useState<number>(50);
+  const [editPrizeType, setEditPrizeType] = useState<'monetary' | 'item'>('monetary');
+  const [editPrizeLabel, setEditPrizeLabel] = useState('وام');
+  const [editPrizeItemName, setEditPrizeItemName] = useState('');
+  const [editShowExcelRow, setEditShowExcelRow] = useState(true);
+  const [editShowPersonnelCode, setEditShowPersonnelCode] = useState(true);
 
   // Safe delete confirmation state
   const [sessionToDelete, setSessionToDelete] = useState<LotterySession | null>(null);
@@ -94,6 +110,11 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
   });
   const [loanAmount, setLoanAmount] = useState('50000000');
   const [maxWinnersCount, setMaxWinnersCount] = useState<number>(50);
+  const [prizeType, setPrizeType] = useState<'monetary' | 'item'>('monetary');
+  const [prizeLabel, setPrizeLabel] = useState('وام');
+  const [prizeItemName, setPrizeItemName] = useState('');
+  const [showExcelRow, setShowExcelRow] = useState(true);
+  const [showPersonnelCode, setShowPersonnelCode] = useState(true);
 
   // Excel state for the creation form
   const [uploadedParticipants, setUploadedParticipants] = useState<Participant[]>([]);
@@ -189,17 +210,32 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
       finalFileName = 'لیست_پیشفرض_۴۵۹_نفره_پرسنل.xlsx';
     }
 
+    if (prizeType === 'item' && !prizeItemName.trim()) {
+      alert('لطفاً عنوان یا نام جایزه غیرنقدی (مثلاً سفر حج عمره، یک دستگاه خودرو...) را وارد نمایید.');
+      return;
+    }
+
     onCreateSession({
       title: title.trim(),
       date: date.trim(),
-      loanAmount: loanAmount.replace(/[^\d]/g, '') || '50000000',
+      loanAmount: prizeType === 'item' ? '' : (loanAmount.replace(/[^\d]/g, '') || '50000000'),
       maxWinnersCount: Number(maxWinnersCount) || 50,
       participants: finalParticipants,
       excelFileName: finalFileName,
+      prizeType,
+      prizeLabel: prizeLabel.trim() || (prizeType === 'item' ? 'جایزه' : 'وام'),
+      prizeItemName: prizeType === 'item' ? prizeItemName.trim() : undefined,
+      showExcelRow,
+      showPersonnelCode,
     });
 
     // Reset create form
     setTitle('');
+    setPrizeItemName('');
+    setPrizeLabel('وام');
+    setPrizeType('monetary');
+    setShowExcelRow(true);
+    setShowPersonnelCode(true);
     setUploadedParticipants([]);
     setExcelFileName('');
     setActiveTab('list');
@@ -208,9 +244,14 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
   const handleStartEdit = (session: LotterySession) => {
     setEditingSessionId(session.id);
     setEditTitle(session.title);
-    setEditLoanAmount(session.loanAmount);
+    setEditLoanAmount(session.loanAmount || '');
     setEditDate(session.date);
     setEditMaxWinners(session.maxWinnersCount);
+    setEditPrizeType(session.prizeType || 'monetary');
+    setEditPrizeLabel(session.prizeLabel || 'وام');
+    setEditPrizeItemName(session.prizeItemName || '');
+    setEditShowExcelRow(session.showExcelRow !== false);
+    setEditShowPersonnelCode(session.showPersonnelCode !== false);
   };
 
   const handleSaveEdit = (e: React.FormEvent, originalSession: LotterySession) => {
@@ -219,13 +260,22 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
       alert('لطفاً عنوان قرعه‌کشی را وارد کنید.');
       return;
     }
+    if (editPrizeType === 'item' && !editPrizeItemName.trim()) {
+      alert('لطفاً نام یا شرح جایزه غیرنقدی را وارد نمایید.');
+      return;
+    }
     const cleanLoan = editLoanAmount.replace(/[^\d]/g, '') || originalSession.loanAmount;
     const updated: LotterySession = {
       ...originalSession,
       title: editTitle.trim(),
-      loanAmount: cleanLoan,
+      loanAmount: editPrizeType === 'item' ? '' : cleanLoan,
       date: editDate.trim() || originalSession.date,
       maxWinnersCount: Number(editMaxWinners) > 0 ? Number(editMaxWinners) : originalSession.maxWinnersCount,
+      prizeType: editPrizeType,
+      prizeLabel: editPrizeLabel.trim() || (editPrizeType === 'item' ? 'جایزه' : 'وام'),
+      prizeItemName: editPrizeType === 'item' ? editPrizeItemName.trim() : undefined,
+      showExcelRow: editShowExcelRow,
+      showPersonnelCode: editShowPersonnelCode,
     };
 
     if (onUpdateSession) {
@@ -410,48 +460,246 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                   />
                 </div>
 
-                {/* 3. Loan Amount */}
+                {/* 3. Max Winners Capacity */}
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <CreditCard className="w-4 h-4 text-amber-400" />
-                    <span>مبلغ وام (ریال) *</span>
+                    <Users className="w-4 h-4 text-amber-400" />
+                    <span>تعداد کل برندگان مجاز (سقف برندگان) *</span>
                   </label>
                   <input
-                    type="text"
-                    value={Number(loanAmount).toLocaleString('fa-IR')}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/[^\d۰-۹]/g, '');
-                      const enRaw = raw.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
-                      setLoanAmount(enRaw || '0');
-                    }}
-                    placeholder="۵۰,۰۰۰,۰۰۰ ریال"
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-amber-300 font-mono focus:outline-none focus:border-amber-400"
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={maxWinnersCount}
+                    onChange={(e) => setMaxWinnersCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-mono focus:outline-none focus:border-amber-400"
                     required
                   />
-                  <p className="text-[11px] text-amber-400/80 mt-1 font-medium truncate">
-                    به حروف: {formatLoanAmount(loanAmount).words}
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    مثال: ۵۰ نفر یا ۱۵۰ نفر برنده نهایی
                   </p>
                 </div>
               </div>
 
-              {/* 4. Max Winners Capacity */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-amber-400" />
-                  <span>تعداد کل برندگان مجاز (سقف برندگان این دوره) *</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10000"
-                  value={maxWinnersCount}
-                  onChange={(e) => setMaxWinnersCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-mono focus:outline-none focus:border-amber-400"
-                  required
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  مثال: ۵۰ نفر یا ۱۵۰ نفر برنده نهایی از کل شرکت‌کنندگان
-                </p>
+              {/* 4. Prize Type & Configuration Card */}
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/40 space-y-3.5 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-slate-800">
+                  <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span>نوع و مشخصات جایزه این دوره قرعه‌کشی *</span>
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setPrizeType('monetary')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        prizeType === 'monetary'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Coins className="w-3.5 h-3.5" />
+                      <span>مبلغ‌دار / نقدی (وام، سکه، تسهیلات...)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrizeType('item')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        prizeType === 'item'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>کالایی / غیرنقدی (سفر حج، خودرو و...)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {prizeType === 'monetary' ? (
+                  /* Monetary Prize Configuration */
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Coins className="w-3.5 h-3.5 text-amber-400" />
+                          <span>عنوان جایزه نقدی (به جای کلمه پیش‌فرض «وام»):</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400">مثلاً: وام، سکه، تسهیلات، پاداش</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={prizeLabel}
+                        onChange={(e) => setPrizeLabel(e.target.value)}
+                        placeholder="وام، سکه، تسهیلات رفاهی، پاداش نقدی..."
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                        required
+                      />
+                      {/* Quick Label Preset Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[10px] text-slate-400">انتخاب سریع عنوان:</span>
+                        {['وام', 'سکه طلا', 'تسهیلات بانکی', 'پاداش نقدی', 'کمک‌هزینه', 'هدیه نقدی'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setPrizeLabel(chip)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                              prizeLabel === chip
+                                ? 'bg-amber-500 text-slate-950'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                        <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                        <span>مبلغ {prizeLabel || 'وام'} (ریال) *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={Number(loanAmount).toLocaleString('fa-IR')}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^\d۰-۹]/g, '');
+                          const enRaw = raw.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+                          setLoanAmount(enRaw || '0');
+                        }}
+                        placeholder="۵۰,۰۰۰,۰۰۰ ریال"
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-amber-300 font-mono focus:outline-none focus:border-amber-400"
+                        required
+                      />
+                      <p className="text-[11px] text-amber-400/80 mt-1 font-medium truncate">
+                        به حروف: {formatLoanAmount(loanAmount).words}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Item / Non-Monetary Prize Configuration */
+                  <div className="space-y-3 animate-fadeIn">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>این جایزه بدون مبلغ ریالی است و فقط عنوان آن در استیج و لیست برندگان نمایش داده می‌شود.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Gift className="w-3.5 h-3.5 text-amber-400" />
+                          <span>نام و عنوان جایزه غیرنقدی (مثلاً سفر حج، یک دستگاه خودرو...) *</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400">فقط نام جایزه بدون مبلغ</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={prizeItemName}
+                        onChange={(e) => setPrizeItemName(e.target.value)}
+                        placeholder="مثال: سفر زیارتی حج عمره، یک دستگاه خودرو، گوشی آیفون..."
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-amber-200 placeholder-slate-500 focus:outline-none focus:border-amber-400 font-bold"
+                        required
+                      />
+                      {/* Quick Item Preset Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[10px] text-slate-400">پیشنهادات پرکاربرد:</span>
+                        {[
+                          'سفر زیارتی حج عمره',
+                          'سفر مشهد مقدس',
+                          'یک دستگاه خودرو',
+                          'یک عدد سکه تمام بهار آزادی',
+                          'گوشی هوشمند سامسونگ',
+                          'لپ‌تاپ کاری',
+                          'بسته لوازم خانگی',
+                        ].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setPrizeItemName(chip)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition cursor-pointer ${
+                              prizeItemName === chip
+                                ? 'bg-amber-500 text-slate-950 font-bold'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                        برچسب نمایشی (پیش‌فرض «جایزه»):
+                      </label>
+                      <input
+                        type="text"
+                        value={prizeLabel}
+                        onChange={(e) => setPrizeLabel(e.target.value)}
+                        placeholder="جایزه، هدیه ویژه..."
+                        className="w-full px-3.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Display Options: Excel Row & Personnel Code Visibility */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-850">
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-amber-400" />
+                    <span>تنظیمات نمایش مشخصات برنده در استیج این قرعه‌کشی:</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">امکان مخفی‌سازی اطلاعات اضافی</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer select-none ${
+                    showExcelRow
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={showExcelRow}
+                      onChange={(e) => setShowExcelRow(e.target.checked)}
+                      className="rounded accent-amber-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-bold flex items-center gap-1">
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400" />
+                        <span>نمایش «ردیف اکسل»</span>
+                      </span>
+                      <span className="text-[10px] opacity-75">
+                        {showExcelRow ? '«ردیف اکسل: ...» نمایش داده می‌شود' : '«ردیف اکسل» مخفی خواهد شد'}
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer select-none ${
+                    showPersonnelCode
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={showPersonnelCode}
+                      onChange={(e) => setShowPersonnelCode(e.target.checked)}
+                      className="rounded accent-amber-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-bold flex items-center gap-1">
+                        <Hash className="w-3.5 h-3.5 text-amber-400" />
+                        <span>نمایش «کد پرسنلی»</span>
+                      </span>
+                      <span className="text-[10px] opacity-75">
+                        {showPersonnelCode ? '«کد پرسنلی: ...» نمایش داده می‌شود' : '«کد پرسنلی» مخفی خواهد شد'}
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               {/* 5. Built-in Excel Upload for THIS Lottery */}
@@ -621,10 +869,19 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                       <Calendar className="w-3.5 h-3.5 text-amber-400" />
                       تاریخ: {selectedSessionForDetails.date}
                     </span>
-                    <span className="flex items-center gap-1 font-mono text-amber-300">
-                      <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                      وام: {formatLoanAmount(selectedSessionForDetails.loanAmount).numeric}
-                    </span>
+                    {selectedSessionForDetails.prizeType === 'item' ? (
+                      <span className="flex items-center gap-1 font-bold text-amber-300">
+                        <Gift className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{selectedSessionForDetails.prizeLabel || 'جایزه'}:</span>
+                        <span className="text-white">{selectedSessionForDetails.prizeItemName || 'کالایی / غیرنقدی'}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 font-mono text-amber-300">
+                        <Coins className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{selectedSessionForDetails.prizeLabel || 'وام'}:</span>
+                        <span>{formatLoanAmount(selectedSessionForDetails.loanAmount).numeric}</span>
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Users className="w-3.5 h-3.5 text-amber-400" />
                       شرکت‌کنندگان: <strong className="font-mono text-white">{(selectedSessionForDetails.participants?.length || selectedSessionForDetails.totalParticipantsCount).toLocaleString('fa-IR')}</strong> نفر
@@ -870,11 +1127,11 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                     >
                       {/* Left: Info or Edit Form */}
                       {editingSessionId === s.id ? (
-                        <form onSubmit={(e) => handleSaveEdit(e, s)} className="w-full space-y-3 p-3 bg-slate-900/90 rounded-xl border border-amber-400/50">
-                          <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                        <form onSubmit={(e) => handleSaveEdit(e, s)} className="w-full space-y-3.5 p-4 bg-slate-900/95 rounded-2xl border-2 border-amber-400/70 shadow-2xl">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                             <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                              <Edit3 className="w-3.5 h-3.5" />
-                              ویرایش عنوان و مشخصات قرعه‌کشی
+                              <Edit3 className="w-4 h-4 text-amber-400" />
+                              <span>ویرایش مشخصات و نوع جایزه قرعه‌کشی</span>
                             </span>
                             <span className="text-[11px] text-slate-400">تغییرات بلافاصله ذخیره و اعمال می‌شود</span>
                           </div>
@@ -888,28 +1145,22 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400 font-bold"
                                 required
                               />
                             </div>
 
                             <div>
                               <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                                مبلغ وام (ریال):
+                                تاریخ برگزاری (شمسی):
                               </label>
                               <input
                                 type="text"
-                                value={Number(editLoanAmount || '0').toLocaleString('fa-IR')}
-                                onChange={(e) => {
-                                  const raw = e.target.value.replace(/[^\d]/g, '');
-                                  setEditLoanAmount(raw || '0');
-                                }}
-                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-amber-400"
                                 required
                               />
-                              <p className="text-[10px] text-amber-400/80 mt-1">
-                                معادل: {formatLoanAmount(editLoanAmount || '0').words}
-                              </p>
                             </div>
 
                             <div>
@@ -922,9 +1173,182 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                                 max="10000"
                                 value={editMaxWinners}
                                 onChange={(e) => setEditMaxWinners(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-amber-400"
                                 required
                               />
+                            </div>
+
+                            {/* Prize Type & Configuration in Edit Form */}
+                            <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-950/90 border border-amber-500/40 space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-800">
+                                <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                  <Award className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>نوع جایزه این دوره قرعه‌کشی:</span>
+                                </span>
+                                <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditPrizeType('monetary')}
+                                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
+                                      editPrizeType === 'monetary'
+                                        ? 'bg-amber-500 text-slate-950'
+                                        : 'text-slate-400 hover:text-white'
+                                    }`}
+                                  >
+                                    <Coins className="w-3 h-3" />
+                                    <span>مبلغ‌دار (وام، سکه، تسهیلات...)</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditPrizeType('item')}
+                                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
+                                      editPrizeType === 'item'
+                                        ? 'bg-amber-500 text-slate-950'
+                                        : 'text-slate-400 hover:text-white'
+                                    }`}
+                                  >
+                                    <Gift className="w-3 h-3" />
+                                    <span>کالایی / غیرنقدی (حج، خودرو...)</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {editPrizeType === 'monetary' ? (
+                                <div className="space-y-2.5">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-300 mb-1 flex items-center justify-between">
+                                      <span>عنوان جایزه نقدی (به جای «وام»):</span>
+                                      <span className="text-slate-500">مثال: وام، سکه، پاداش، تسهیلات</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editPrizeLabel}
+                                      onChange={(e) => setEditPrizeLabel(e.target.value)}
+                                      placeholder="وام، سکه، تسهیلات رفاهی..."
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-400"
+                                      required
+                                    />
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {['وام', 'سکه طلا', 'تسهیلات بانکی', 'پاداش نقدی', 'کمک‌هزینه'].map((c) => (
+                                        <button
+                                          key={c}
+                                          type="button"
+                                          onClick={() => setEditPrizeLabel(c)}
+                                          className={`text-[9px] px-2 py-0.5 rounded transition cursor-pointer ${
+                                            editPrizeLabel === c
+                                              ? 'bg-amber-500 text-slate-950 font-bold'
+                                              : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                                          }`}
+                                        >
+                                          {c}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                                      مبلغ {editPrizeLabel || 'وام'} (ریال):
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={Number(editLoanAmount || '0').toLocaleString('fa-IR')}
+                                      onChange={(e) => {
+                                        const raw = e.target.value.replace(/[^\d]/g, '');
+                                        setEditLoanAmount(raw || '0');
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-400"
+                                      required
+                                    />
+                                    <p className="text-[10px] text-amber-400/80 mt-1 truncate">
+                                      معادل: {formatLoanAmount(editLoanAmount || '0').words}
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2.5 animate-fadeIn">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                                      نام و شرح جایزه غیرنقدی (مثلاً سفر حج عمره، یک دستگاه خودرو...) *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editPrizeItemName}
+                                      onChange={(e) => setEditPrizeItemName(e.target.value)}
+                                      placeholder="سفر زیارتی حج عمره، یک دستگاه خودرو..."
+                                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs sm:text-sm text-amber-200 font-bold focus:outline-none focus:border-amber-400"
+                                      required
+                                    />
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {['سفر زیارتی حج عمره', 'سفر مشهد مقدس', 'یک دستگاه خودرو', 'یک عدد سکه تمام بهار آزادی', 'گوشی هوشمند'].map((c) => (
+                                        <button
+                                          key={c}
+                                          type="button"
+                                          onClick={() => setEditPrizeItemName(c)}
+                                          className={`text-[9px] px-2 py-0.5 rounded transition cursor-pointer ${
+                                            editPrizeItemName === c
+                                              ? 'bg-amber-500 text-slate-950 font-bold'
+                                              : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                                          }`}
+                                        >
+                                          {c}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                                      برچسب نمایشی (اختیاری، پیش‌فرض «جایزه»):
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editPrizeLabel}
+                                      onChange={(e) => setEditPrizeLabel(e.target.value)}
+                                      placeholder="جایزه"
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-400"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Display Options in Edit Form */}
+                            <div className="sm:col-span-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                                <span className="flex items-center gap-1.5">
+                                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>تنظیمات نمایش مشخصات برنده در استیج:</span>
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                <label className={`flex items-center gap-2 p-2 rounded-lg border transition cursor-pointer select-none ${
+                                  editShowExcelRow
+                                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+                                    : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={editShowExcelRow}
+                                    onChange={(e) => setEditShowExcelRow(e.target.checked)}
+                                    className="rounded accent-amber-500 w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-[11px] font-bold">نمایش «ردیف اکسل»</span>
+                                </label>
+                                <label className={`flex items-center gap-2 p-2 rounded-lg border transition cursor-pointer select-none ${
+                                  editShowPersonnelCode
+                                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+                                    : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={editShowPersonnelCode}
+                                    onChange={(e) => setEditShowPersonnelCode(e.target.checked)}
+                                    className="rounded accent-amber-500 w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-[11px] font-bold">نمایش «کد پرسنلی»</span>
+                                </label>
+                              </div>
                             </div>
                           </div>
 
@@ -932,13 +1356,13 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                             <button
                               type="button"
                               onClick={handleCancelEdit}
-                              className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                              className="px-3.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 text-slate-300 transition cursor-pointer"
                             >
                               انصراف
                             </button>
                             <button
                               type="submit"
-                              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1 transition cursor-pointer shadow-md"
+                              className="px-5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 transition cursor-pointer shadow-md"
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>ذخیره تغییرات</span>
@@ -974,18 +1398,37 @@ export const LotterySessionsModal: React.FC<LotterySessionsModalProps> = ({
                                 <Calendar className="w-3.5 h-3.5 text-amber-400" />
                                 تاریخ: {s.date}
                               </span>
-                              <span className="flex items-center gap-1 font-mono text-amber-300">
-                                <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                                وام: {formatLoanAmount(s.loanAmount).numeric}
-                              </span>
+                              {s.prizeType === 'item' ? (
+                                <span className="flex items-center gap-1 font-bold text-amber-300">
+                                  <Gift className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>{s.prizeLabel || 'جایزه'}:</span>
+                                  <span className="text-white">{s.prizeItemName || 'کالایی / غیرنقدی'}</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 font-mono text-amber-300">
+                                  <Coins className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>{s.prizeLabel || 'وام'}:</span>
+                                  <span>{formatLoanAmount(s.loanAmount).numeric}</span>
+                                </span>
+                              )}
                               <span className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5 text-amber-400" />
-                                شرکت‌کنندگان این دوره: <strong className="font-mono text-white">{participantCount.toLocaleString('fa-IR')}</strong> نفر
+                                شرکت‌کنندگان: <strong className="font-mono text-white">{participantCount.toLocaleString('fa-IR')}</strong> نفر
                               </span>
                               <span className="flex items-center gap-1">
                                 <Trophy className="w-3.5 h-3.5 text-amber-400" />
                                 برندگان: <strong className="font-mono text-amber-300 font-bold">{s.winners.length.toLocaleString('fa-IR')}</strong> از {s.maxWinnersCount.toLocaleString('fa-IR')} نفر
                               </span>
+                              {s.showExcelRow === false && (
+                                <span className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
+                                  بدون نمایش ردیف اکسل
+                                </span>
+                              )}
+                              {s.showPersonnelCode === false && (
+                                <span className="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
+                                  بدون نمایش کد پرسنلی
+                                </span>
+                              )}
                             </div>
                           </div>
 

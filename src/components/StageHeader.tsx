@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppSettings, Winner, AdminUser } from '../types';
 import { sound } from '../utils/audio';
-import { getWinnerOrdinalTitle } from '../utils/format';
+import { getWinnerOrdinalTitle, formatLoanAmount } from '../utils/format';
 import {
   Trophy,
   FileSpreadsheet,
@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   LogOut,
   User,
+  Coins,
+  Gift,
+  Hash,
 } from 'lucide-react';
 
 interface StageHeaderProps {
@@ -37,6 +40,14 @@ interface StageHeaderProps {
   activeSessionTitle?: string;
   activeSessionDate?: string;
   activeSessionMaxWinners?: number;
+  activeSessionPrizeType?: 'monetary' | 'item';
+  activeSessionPrizeLabel?: string;
+  activeSessionPrizeItemName?: string;
+  activeSessionLoanAmount?: string;
+  showExcelRow?: boolean;
+  showPersonnelCode?: boolean;
+  onToggleExcelRow?: () => void;
+  onTogglePersonnelCode?: () => void;
   currentUser?: AdminUser | null;
   onOpenAdminManagement?: () => void;
   onLogout?: () => void;
@@ -59,6 +70,14 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
   activeSessionTitle,
   activeSessionDate,
   activeSessionMaxWinners,
+  activeSessionPrizeType,
+  activeSessionPrizeLabel,
+  activeSessionPrizeItemName,
+  activeSessionLoanAmount,
+  showExcelRow = true,
+  showPersonnelCode = true,
+  onToggleExcelRow,
+  onTogglePersonnelCode,
   currentUser,
   onOpenAdminManagement,
   onLogout,
@@ -192,8 +211,26 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
 
         {/* Right: Quick Action Controls */}
         <div className="flex items-center gap-1.5">
-          {/* Prize Title Display (only shown if configured and not empty) */}
-          {settings.prizeTitle && settings.prizeTitle.trim() !== '' && (
+          {/* Prize Display (Session-specific or global) */}
+          {activeSessionPrizeType === 'item' ? (
+            <div
+              className="px-2.5 py-1.5 rounded-xl bg-amber-950/50 border border-amber-500/50 text-slate-300 text-xs flex items-center gap-1.5 select-none shadow-sm"
+              title="جایزه این دوره قرعه‌کشی"
+            >
+              <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden md:inline text-amber-400 font-bold">{activeSessionPrizeLabel || 'جایزه'}:</span>
+              <span className="truncate max-w-[150px] font-bold text-white">{activeSessionPrizeItemName || 'کالایی'}</span>
+            </div>
+          ) : activeSessionLoanAmount ? (
+            <div
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300 text-xs flex items-center gap-1.5 select-none font-mono"
+              title={`مبلغ ${activeSessionPrizeLabel || 'وام'} این دوره`}
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden md:inline text-slate-400 font-sans">{activeSessionPrizeLabel || 'وام'}:</span>
+              <span className="truncate max-w-[150px] font-bold text-amber-300">{formatLoanAmount(activeSessionLoanAmount).numeric}</span>
+            </div>
+          ) : settings.prizeTitle && settings.prizeTitle.trim() !== '' ? (
             <div
               className="px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300 text-xs flex items-center gap-1.5 select-none"
               title="عنوان جایزه (تنظیم از بخش تنظیمات)"
@@ -202,16 +239,50 @@ export const StageHeader: React.FC<StageHeaderProps> = ({
               <span className="hidden md:inline text-slate-400">جایزه:</span>
               <span className="truncate max-w-[130px] font-bold text-white">{settings.prizeTitle}</span>
             </div>
-          )}
+          ) : null}
 
           {/* Privacy Mobile Mask Toggle */}
           <button
             onClick={() => onUpdateSettings({ maskMobile: !settings.maskMobile })}
-            title={settings.maskMobile ? 'نمایش کامل شماره‌ها' : 'مخفی‌سازی میانی شماره تماس'}
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition cursor-pointer hidden sm:flex"
+            title={settings.maskMobile ? 'مخفی‌سازی میانی فعال است (کلیک برای نمایش کامل)' : 'نمایش کامل شماره‌ها (کلیک برای مخفی‌سازی)'}
+            className={`p-2 rounded-xl border transition cursor-pointer hidden sm:flex ${
+              settings.maskMobile
+                ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-amber-400'
+                : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+            }`}
           >
             {settings.maskMobile ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
+
+          {/* Quick Toggle: Excel Row Visibility */}
+          {onToggleExcelRow && (
+            <button
+              onClick={onToggleExcelRow}
+              title={showExcelRow ? 'ردیف اکسل فعال است (کلیک برای مخفی‌سازی)' : 'ردیف اکسل مخفی است (کلیک برای نمایش)'}
+              className={`p-2 rounded-xl border transition cursor-pointer hidden md:flex items-center gap-1 ${
+                showExcelRow
+                  ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-blue-300 hover:text-amber-400'
+                  : 'bg-red-500/15 border-red-500/40 text-red-400'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Quick Toggle: Personnel Code Visibility */}
+          {onTogglePersonnelCode && (
+            <button
+              onClick={onTogglePersonnelCode}
+              title={showPersonnelCode ? 'کد پرسنلی فعال است (کلیک برای مخفی‌سازی)' : 'کد پرسنلی مخفی است (کلیک برای نمایش)'}
+              className={`p-2 rounded-xl border transition cursor-pointer hidden md:flex items-center gap-1 ${
+                showPersonnelCode
+                  ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-amber-300 hover:text-white'
+                  : 'bg-red-500/15 border-red-500/40 text-red-400'
+              }`}
+            >
+              <Hash className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Sound Toggle */}
           <button

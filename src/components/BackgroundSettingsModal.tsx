@@ -26,6 +26,13 @@ import {
   Trophy,
   Sparkles,
   FileCheck,
+  Gift,
+  CreditCard,
+  Eye,
+  EyeOff,
+  FileSpreadsheet,
+  Hash,
+  Phone,
 } from 'lucide-react';
 import { fetchBackgroundsFromDb, saveBackgroundToDb, activateBackgroundInDb, deleteBackgroundFromDb } from '../utils/api';
 import { formatLoanAmount } from '../utils/format';
@@ -246,34 +253,231 @@ export const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = (
         {/* Tab 1: General Settings */}
         {activeTab === 'general' && (
           <div className="py-4 space-y-5 overflow-y-auto max-h-[65vh]">
-            {/* 1. Prize Title Section */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2.5 shadow-inner">
-              <div className="flex items-center justify-between">
-                <label htmlFor="input-prize-title" className="text-sm font-bold text-slate-200 flex items-center gap-2">
+            {/* 1. Prize Configuration Section */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-inner">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-800">
+                <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
                   <Award className="w-4 h-4 text-amber-400" />
-                  <span>عنوان عمومی جایزه (اختیاری):</span>
-                </label>
-                {settings.prizeTitle && (
+                  <span>تنظیم پیش‌فرض نوع و مشخصات جایزه:</span>
+                </span>
+                <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-xl border border-slate-800">
                   <button
                     type="button"
-                    onClick={() => onUpdateSettings({ prizeTitle: '' })}
-                    className="text-[11px] text-red-400 hover:text-red-300 transition cursor-pointer"
+                    onClick={() => onUpdateSettings({ prizeType: 'monetary' })}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                      (settings.prizeType || 'monetary') === 'monetary'
+                        ? 'bg-amber-500 text-slate-950 font-black shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    حذف عنوان جایزه
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>مبلغ‌دار (وام/سکه/تسهیلات)</span>
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ prizeType: 'item' })}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                      settings.prizeType === 'item'
+                        ? 'bg-amber-500 text-slate-950 font-black shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>کالایی / غیرنقدی (حج/خودرو)</span>
+                  </button>
+                </div>
               </div>
-              <input
-                id="input-prize-title"
-                type="text"
-                value={settings.prizeTitle}
-                onChange={(e) => onUpdateSettings({ prizeTitle: e.target.value })}
-                placeholder="در صورت تمایل عنوان دلخواه وارد کنید (اختیاری)"
-                className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none transition"
-              />
+
+              {(settings.prizeType || 'monetary') === 'monetary' ? (
+                /* Monetary Settings */
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5 text-amber-400" />
+                        <span>متن عنوان یا برچسب جایزه (به جای کلمه «وام»):</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">سکه، پاداش، تسهیلات و...</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.prizeLabel ?? 'وام'}
+                      onChange={(e) => onUpdateSettings({ prizeLabel: e.target.value })}
+                      placeholder="وام، سکه، تسهیلات، پاداش نقدی..."
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none transition"
+                    />
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-slate-400">انتخاب سریع:</span>
+                      {['وام', 'سکه طلا', 'تسهیلات بانکی', 'پاداش نقدی', 'کمک‌هزینه'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => onUpdateSettings({ prizeLabel: c })}
+                          className={`px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition cursor-pointer ${
+                            (settings.prizeLabel ?? 'وام') === c
+                              ? 'bg-amber-500 text-slate-950 font-bold'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                      <span>مبلغ پیش‌فرض {settings.prizeLabel || 'وام'} (ریال):</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={Number(settings.loanAmount || '50000000').toLocaleString('fa-IR')}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d۰-۹]/g, '');
+                        const enRaw = raw.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+                        onUpdateSettings({ loanAmount: enRaw || '0' });
+                      }}
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-amber-300 font-mono outline-none transition"
+                    />
+                    <p className="text-[11px] text-amber-400/80 mt-1 truncate">
+                      معادل: {formatLoanAmount(settings.loanAmount || '50000000').words}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Non-Monetary Item Settings */
+                <div className="space-y-3 animate-fadeIn">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>در این حالت هیچ مبلغ یا رقمی به عنوان قیمت نمایش داده نمی‌شود و تنها عنوان جایزه درج می‌گردد.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                      <Gift className="w-3.5 h-3.5 text-amber-400" />
+                      <span>عنوان یا نام جایزه غیرنقدی (مثلاً سفر حج عمره، یک دستگاه خودرو...):</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.prizeItemName ?? ''}
+                      onChange={(e) => onUpdateSettings({ prizeItemName: e.target.value })}
+                      placeholder="مثال: سفر زیارتی حج عمره، یک دستگاه خودرو..."
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl px-3.5 py-2 text-sm text-amber-200 font-bold placeholder-slate-500 outline-none transition"
+                    />
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {['سفر زیارتی حج عمره', 'سفر مشهد مقدس', 'یک دستگاه خودرو', 'یک عدد سکه بهار آزادی'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => onUpdateSettings({ prizeItemName: c })}
+                          className={`px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition cursor-pointer ${
+                            settings.prizeItemName === c
+                              ? 'bg-amber-500 text-slate-950 font-bold'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* 2. Spin Duration Section */}
+            {/* 2. Display & Privacy Options (Excel Row & Personnel Code Visibility) */}
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-inner">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>تنظیمات نمایش مشخصات برنده و حریم خصوصی در استیج:</span>
+                </span>
+                <span className="text-[10px] text-slate-400">امکان عدم نمایش اطلاعات مازاد</span>
+              </div>
+
+              <div className="space-y-2.5">
+                {/* 1. Toggle Show Excel Row */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+                      <span>نمایش «ردیف اکسل» در گردونه و پنجره معرفی برنده</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      در صورت غیرفعال بودن، عبارت «ردیف اکسل: ...» مخفی می‌شود.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ showExcelRow: settings.showExcelRow === false ? true : false })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.showExcelRow !== false ? 'bg-amber-500' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-slate-950 shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.showExcelRow !== false ? 'translate-x-0' : '-translate-x-5'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* 2. Toggle Show Personnel Code */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <Hash className="w-4 h-4 text-amber-400" />
+                      <span>نمایش «کد پرسنلی» در گردونه و پنجره معرفی برنده</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      در صورت غیرفعال بودن، عبارت «کد پرسنلی: ...» مخفی می‌شود.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ showPersonnelCode: settings.showPersonnelCode === false ? true : false })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.showPersonnelCode !== false ? 'bg-amber-500' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-slate-950 shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.showPersonnelCode !== false ? 'translate-x-0' : '-translate-x-5'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* 3. Toggle Mask Mobile */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-emerald-400" />
+                      <span>مخفی‌سازی میانی شماره تماس همراه (حفظ حریم خصوصی)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      چهار رقم میانی شماره همراه با ستاره پوشانده می‌شود (مثال: 0912***1234).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ maskMobile: !settings.maskMobile })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.maskMobile ? 'bg-amber-500' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-slate-950 shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.maskMobile ? 'translate-x-0' : '-translate-x-5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Spin Duration Section */}
             <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-300">
                 <span className="flex items-center gap-1.5 font-bold">

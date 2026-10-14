@@ -71,7 +71,10 @@ async function initDatabase() {
       credit_deferred TEXT,
       charge_credit TEXT,
       won_at TEXT,
-      created_at TEXT
+      created_at TEXT,
+      prize_type TEXT DEFAULT 'monetary',
+      prize_label TEXT DEFAULT 'وام',
+      prize_item_name TEXT
     );
 
     CREATE TABLE IF NOT EXISTS participants (
@@ -110,7 +113,12 @@ async function initDatabase() {
       participants_json TEXT,
       excel_file_name TEXT,
       created_at TEXT,
-      completed_at TEXT
+      completed_at TEXT,
+      prize_type TEXT DEFAULT 'monetary',
+      prize_label TEXT DEFAULT 'وام',
+      prize_item_name TEXT,
+      show_excel_row INTEGER DEFAULT 1,
+      show_personnel_code INTEGER DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS admins (
@@ -147,6 +155,46 @@ async function initDatabase() {
   }
   try {
     db.run('ALTER TABLE lottery_sessions ADD COLUMN excel_file_name TEXT');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN prize_type TEXT DEFAULT "monetary"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN prize_label TEXT DEFAULT "وام"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN prize_item_name TEXT');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN show_excel_row INTEGER DEFAULT 1');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE lottery_sessions ADD COLUMN show_personnel_code INTEGER DEFAULT 1');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE winners ADD COLUMN prize_type TEXT DEFAULT "monetary"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE winners ADD COLUMN prize_label TEXT DEFAULT "وام"');
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run('ALTER TABLE winners ADD COLUMN prize_item_name TEXT');
   } catch {
     // column already exists
   }
@@ -756,6 +804,9 @@ async function startServer() {
         chargeCredit: String(r.charge_credit || ''),
         wonAt: String(r.won_at || ''),
         originalRowIndex: 0,
+        prizeType: (r.prize_type as 'monetary' | 'item') || 'monetary',
+        prizeLabel: r.prize_label ? String(r.prize_label) : 'وام',
+        prizeItemName: r.prize_item_name ? String(r.prize_item_name) : undefined,
       }));
       res.json({ success: true, winners });
     } catch (err: unknown) {
@@ -774,8 +825,8 @@ async function startServer() {
 
       db.run(
         `INSERT OR REPLACE INTO winners 
-        (id, draw_round, winner_rank_title, prize_title, full_name, personnel_code, mobile, row_number, loan_amount, loan_words, credit_deferred, charge_credit, won_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, draw_round, winner_rank_title, prize_title, full_name, personnel_code, mobile, row_number, loan_amount, loan_words, credit_deferred, charge_credit, won_at, created_at, prize_type, prize_label, prize_item_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(w.id),
           Number(w.drawRound || 1),
@@ -791,6 +842,9 @@ async function startServer() {
           String(w.chargeCredit || ''),
           String(w.wonAt || ''),
           new Date().toISOString(),
+          String(w.prizeType || 'monetary'),
+          String(w.prizeLabel || 'وام'),
+          w.prizeItemName ? String(w.prizeItemName) : null,
         ]
       );
 
@@ -1029,6 +1083,11 @@ async function startServer() {
           excelFileName: r.excel_file_name ? String(r.excel_file_name) : undefined,
           createdAt: String(r.created_at || ''),
           completedAt: r.completed_at ? String(r.completed_at) : undefined,
+          prizeType: (r.prize_type as 'monetary' | 'item') || 'monetary',
+          prizeLabel: r.prize_label ? String(r.prize_label) : 'وام',
+          prizeItemName: r.prize_item_name ? String(r.prize_item_name) : undefined,
+          showExcelRow: r.show_excel_row !== undefined ? (Number(r.show_excel_row) === 1 || r.show_excel_row === true || r.show_excel_row === '1') : true,
+          showPersonnelCode: r.show_personnel_code !== undefined ? (Number(r.show_personnel_code) === 1 || r.show_personnel_code === true || r.show_personnel_code === '1') : true,
         };
       });
       res.json({ success: true, sessions });
@@ -1048,8 +1107,8 @@ async function startServer() {
 
       db.run(
         `INSERT OR REPLACE INTO lottery_sessions 
-        (id, title, date, loan_amount, max_winners_count, status, total_participants_count, winners_json, participants_json, excel_file_name, created_at, completed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, title, date, loan_amount, max_winners_count, status, total_participants_count, winners_json, participants_json, excel_file_name, created_at, completed_at, prize_type, prize_label, prize_item_name, show_excel_row, show_personnel_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(session.id),
           String(session.title || ''),
@@ -1063,6 +1122,11 @@ async function startServer() {
           session.excelFileName ? String(session.excelFileName) : null,
           String(session.createdAt || new Date().toISOString()),
           session.completedAt ? String(session.completedAt) : null,
+          String(session.prizeType || 'monetary'),
+          String(session.prizeLabel || 'وام'),
+          session.prizeItemName ? String(session.prizeItemName) : null,
+          session.showExcelRow === false ? 0 : 1,
+          session.showPersonnelCode === false ? 0 : 1,
         ]
       );
 
