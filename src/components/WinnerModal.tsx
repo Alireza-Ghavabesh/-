@@ -7,13 +7,12 @@ import {
   CheckCircle2,
   RotateCcw,
   Award,
-  User,
   Coins,
-  Hash,
   Gift,
-  AtSign,
   Copy,
   Check,
+  Instagram,
+  ExternalLink,
 } from 'lucide-react';
 
 interface WinnerModalProps {
@@ -37,7 +36,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   winner,
   prizeTitle,
   drawRound,
-  maskMobile: _initialMaskMobile,
+  maskMobile: initialMaskMobile,
   loanAmount,
   useSettingsLoanAmount = true,
   prizeType = 'monetary',
@@ -52,18 +51,20 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   const [copied, setCopied] = useState(false);
   const winnerRankTitle = getWinnerOrdinalTitle(drawRound);
 
-  const effectiveLoanRaw = (useSettingsLoanAmount || !winner?.creditDeferred)
-    ? (loanAmount || winner?.creditDeferred)
-    : winner?.creditDeferred;
+  const effectiveLoanRaw =
+    useSettingsLoanAmount || !winner?.creditDeferred
+      ? loanAmount || winner?.creditDeferred
+      : winner?.creditDeferred;
 
-  const loanInfo = effectiveLoanRaw ? formatLoanAmount(effectiveLoanRaw) : (winner ? formatLoanAmount(winner.creditDeferred) : null);
-
-  const isInstagram = lotteryMode === 'instagram' || Boolean(winner?.instagramUsername) || winner?.personnelCode === '---';
+  const loanInfo = effectiveLoanRaw
+    ? formatLoanAmount(effectiveLoanRaw)
+    : winner
+    ? formatLoanAmount(winner.creditDeferred)
+    : null;
 
   useEffect(() => {
     if (!winner) return;
 
-    // Trigger explosive celebratory confetti shower from both corners and center
     const duration = 3.5 * 1000;
     const end = Date.now() + duration;
 
@@ -92,9 +93,27 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
 
   if (!winner) return null;
 
-  const handleCopyUsername = () => {
-    const handle = winner.instagramUsername ? `@${winner.instagramUsername}` : winner.fullName;
-    navigator.clipboard.writeText(handle);
+  const isInstagram =
+    lotteryMode === 'instagram' ||
+    Boolean(winner.instagramUsername) ||
+    winner.personnelCode === '---';
+
+  // حذف @ از آیدی
+  const cleanUsername = (winner.fullName || '').replace(/@/g, '').trim();
+  const instagramProfileUrl = `https://instagram.com/${encodeURIComponent(cleanUsername)}`;
+
+  // تنظیم پویا اندازه فونت برای جلوگیری از بیرون‌زدگی یوزرنیم‌های طولانی
+  const getUsernameFontSize = (text: string) => {
+    const len = text.length;
+    if (len > 24) return 'text-lg sm:text-2xl md:text-3xl tracking-tight';
+    if (len > 18) return 'text-xl sm:text-3xl md:text-4xl';
+    if (len > 13) return 'text-2xl sm:text-4xl md:text-5xl';
+    return 'text-3xl sm:text-5xl md:text-6xl';
+  };
+
+  const handleCopy = () => {
+    if (!cleanUsername) return;
+    navigator.clipboard.writeText(cleanUsername);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -102,180 +121,192 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   const handleConfirm = () => {
     const isItem = prizeType === 'item';
     const displayPrizeTitle = isItem
-      ? (prizeItemName || prizeTitle || winnerRankTitle)
-      : (prizeTitle || winnerRankTitle);
+      ? prizeItemName || prizeTitle || winnerRankTitle
+      : prizeTitle || winnerRankTitle;
 
     const winnerRecord: Winner = {
       ...winner,
-      wonAt: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      wonAt: new Date().toLocaleTimeString('fa-IR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
       drawRound,
       winnerRankTitle,
       prizeTitle: displayPrizeTitle,
-      loanAmount: isItem ? '' : (loanInfo?.numeric || '۰ ریال'),
-      loanWords: isItem ? '' : (loanInfo?.words || ''),
+      loanAmount: isItem ? '' : loanInfo?.numeric || '۰ ریال',
+      loanWords: isItem ? '' : loanInfo?.words || '',
       prizeType: prizeType || 'monetary',
       prizeLabel: prizeLabel || 'وام',
       prizeItemName: prizeItemName || (isItem ? displayPrizeTitle : ''),
       lotteryMode: isInstagram ? 'instagram' : 'personnel',
-      instagramUsername: winner.instagramUsername || (isInstagram ? winner.fullName.replace(/^@/, '') : undefined),
     };
     onConfirmWinner(winnerRecord);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      {/* Golden Stage Glow */}
-      <div className="absolute w-[500px] h-[500px] bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+      {/* هاله نور طلایی پشت مدال */}
+      <div className="absolute w-[600px] h-[600px] bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Main Winner Card */}
-      <div className="relative w-full max-w-xl bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-400 rounded-3xl p-6 md:p-8 shadow-[0_0_80px_rgba(217,119,6,0.4)] text-center flex flex-col items-center overflow-hidden">
-        {/* Decorative Top Ribbon */}
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-yellow-400/10 rounded-full blur-xl pointer-events-none" />
-
-        {/* Floating Trophy Icon */}
-        <div className="relative mb-3">
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-linear-to-b from-amber-300 via-amber-500 to-amber-700 p-1 shadow-xl flex items-center justify-center animate-bounce">
+      {/* کادر عریض مدال */}
+      <div className="relative w-full max-w-3xl lg:max-w-4xl bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-400 rounded-3xl p-5 sm:p-8 shadow-[0_0_80px_rgba(217,119,6,0.4)] text-center flex flex-col items-center overflow-hidden">
+        
+        {/* کاپ برنده */}
+        <div className="relative mb-2">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-linear-to-b from-amber-300 via-amber-500 to-amber-700 p-1 shadow-xl flex items-center justify-center animate-bounce">
             <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center">
-              <Trophy className="w-10 h-10 md:w-12 md:h-12 text-amber-300" />
+              <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-amber-300" />
             </div>
           </div>
         </div>
 
-        {/* Stage Titles */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs md:text-sm font-bold mb-2">
+        {/* عنوان نوبت و جایزه */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-bold mb-2">
           {prizeType === 'item' ? <Gift className="w-4 h-4 text-amber-400" /> : <Award className="w-4 h-4" />}
           <span>
             {winnerRankTitle} {prizeType === 'item' ? (prizeItemName ? `• ${prizeItemName}` : '') : (prizeTitle ? `• ${prizeTitle}` : '')}
           </span>
         </div>
 
-        <h2 className="text-xl md:text-2xl font-black text-amber-400 mb-1">
+        <h2 className="text-xl sm:text-2xl font-black text-amber-400 mb-1">
           🎉 مشخص شدن {winnerRankTitle} 🎉
         </h2>
-        <p className="text-xs text-slate-400 mb-6">
+        <p className="text-xs text-slate-400 mb-5">
           {isInstagram
-            ? `آیدی ${winnerRankTitle} با موفقیت توسط گردونه شانس انتخاب گردید`
-            : `نام ${winnerRankTitle} با موفقیت توسط گردونه شانس انتخاب گردید`}
+            ? 'آیدی برنده با موفقیت توسط گردونه شانس انتخاب گردید'
+            : 'برنده خوش‌شانس با موفقیت توسط گردونه انتخاب گردید'}
         </p>
 
-        {/* Winner Big Spotlight Card */}
-        <div className="w-full bg-slate-950/85 border-2 border-amber-400/70 rounded-3xl p-6 md:p-8 mb-6 shadow-[0_0_40px_rgba(251,191,36,0.15)] flex flex-col items-center">
-          <span className="text-xs md:text-sm font-bold text-amber-400/90 tracking-widest uppercase mb-1 flex items-center gap-1.5">
-            {isInstagram && <AtSign className="w-3.5 h-3.5 text-pink-400" />}
-            <span>برنده خوش‌شانس این دور {isInstagram ? '(اینستاگرام)' : ''}</span>
+        {/* باکس مشخصات برنده */}
+        <div className="w-full bg-slate-950/90 border-2 border-amber-400/70 rounded-3xl p-4 sm:p-7 mb-5 shadow-[0_0_35px_rgba(251,191,36,0.15)] flex flex-col items-center">
+          <span className="text-xs sm:text-sm font-bold text-amber-400/90 tracking-wide mb-3 flex items-center gap-1.5">
+            <span>
+              {isInstagram ? 'برنده خوش‌شانس این دور (اینستاگرام)' : 'برنده خوش‌شانس این دور'}
+            </span>
           </span>
 
-          {isInstagram ? (
-            <div className="flex flex-col items-center gap-2 my-3">
-              <div className="flex items-center gap-3">
-                <span className="p-2 rounded-2xl bg-linear-to-tr from-amber-500 via-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25">
-                  <AtSign className="w-6 h-6 sm:w-8 sm:h-8" />
-                </span>
-                <span className="text-3xl sm:text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight font-mono select-all">
-                  {winner.fullName}
-                </span>
+          {/* ردیف آیدی برنده: LTR با آیکون در چپ */}
+          <div
+            dir={isInstagram ? 'ltr' : 'rtl'}
+            className="flex items-center justify-center gap-2.5 sm:gap-4 w-full max-w-full px-2 py-2 overflow-hidden"
+          >
+            {isInstagram && (
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-linear-to-tr from-pink-500 via-rose-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/30 text-white shrink-0 border border-white/20">
+                <span className="text-sm sm:text-base font-black font-mono">@</span>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyUsername}
-                className="mt-1 px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+            )}
+
+            <span
+              title={cleanUsername}
+              className={`font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 drop-shadow-[0_4px_18px_rgba(251,191,36,0.45)] truncate select-all leading-normal ${getUsernameFontSize(
+                cleanUsername
+              )}`}
+            >
+              {cleanUsername}
+            </span>
+          </div>
+
+          {/* ردیف دکمه لینک پیج اینستاگرام و دکمه کپی آیدی */}
+          <div className="mt-3.5 mb-5 flex flex-wrap items-center justify-center gap-2.5">
+            {/* دکمه ورود مستقیم به پیج با تم رنگی اینستاگرام */}
+            {isInstagram && cleanUsername && (
+              <a
+                href={instagramProfileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black text-white bg-linear-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-500 hover:via-pink-500 hover:to-amber-400 shadow-lg shadow-pink-600/30 hover:shadow-pink-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer select-none border border-white/10"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-                <span>{copied ? 'آیدی کپی شد!' : 'کپی آیدی'}</span>
-              </button>
-            </div>
-          ) : (
-            <div className="text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-200 via-yellow-300 to-amber-100 tracking-tight text-center drop-shadow-[0_4px_20px_rgba(251,191,36,0.5)] my-3 leading-tight select-all">
-              {winner.fullName}
+                <Instagram className="w-4 h-4 shrink-0" />
+                <span>نمایش پیج برنده خوش شانس این دور</span>
+                <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />
+              </a>
+            )}
+
+            {/* دکمه کمکی کپی آیدی یا نام */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 text-xs font-medium transition cursor-pointer flex items-center gap-1.5"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="text-emerald-300 font-bold">کپی شد</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-amber-400" />
+                  <span>کپی {isInstagram ? 'آیدی' : 'نام'}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* اطلاعات سازمانی در صورت وجود */}
+          {!isInstagram && (showExcelRow !== false || (showPersonnelCode !== false && winner.personnelCode && winner.personnelCode !== '---')) && (
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+              {showExcelRow !== false && (
+                <span className="text-xs text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-400/40 font-mono">
+                  ردیف اکسل: {winner.rowNumber}
+                </span>
+              )}
+              {showPersonnelCode !== false && winner.personnelCode && winner.personnelCode !== '---' && (
+                <span className="text-xs text-slate-300 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 font-mono">
+                  کد پرسنلی: {winner.personnelCode}
+                </span>
+              )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 w-full text-right text-xs md:text-sm mt-2">
-            {/* Personnel Code (hidden if Instagram or disabled by user) */}
-            {showPersonnelCode !== false && !isInstagram && winner.personnelCode !== '---' && (
-              <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
-                showExcelRow === false ? 'col-span-2' : ''
-              }`}>
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <Hash className="w-4 h-4 text-amber-400" />
-                  کد پرسنلی:
-                </span>
-                <span className="font-bold text-white font-mono text-base">{winner.personnelCode}</span>
-              </div>
-            )}
-
-            {/* Excel Row */}
-            {showExcelRow !== false && (
-              <div className={`bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between ${
-                (showPersonnelCode === false || isInstagram || winner.personnelCode === '---') ? 'col-span-2' : ''
-              }`}>
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-amber-400" />
-                  ردیف اکسل:
-                </span>
-                <span className="font-bold text-white font-mono text-base">{winner.rowNumber}</span>
-              </div>
-            )}
-
-            {/* Prize Card: Either Monetary with Custom Label (وام، تسهیلات، سکه) or Non-Monetary Item (سفر حج، خودرو) */}
+          {/* بخش جایزه */}
+          <div className="w-full text-right text-xs sm:text-sm">
             {prizeType === 'item' ? (
-              <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
-                <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
+              <div className="bg-amber-950/40 border border-amber-500/60 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between shadow-md">
+                <span className="text-amber-300 font-bold flex items-center gap-2">
                   <Gift className="w-5 h-5 text-amber-400 shrink-0" />
-                  <span>{prizeLabel || 'جایزه این دور'}:</span>
+                  <span>{prizeLabel || 'جایزه'}:</span>
                 </span>
-                <div className="flex flex-col sm:items-end text-right sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black text-amber-300 drop-shadow-md">
-                    {prizeItemName || prizeTitle || 'جایزه ویژه'}
-                  </div>
-                </div>
+                <span className="text-base sm:text-xl font-black text-amber-200 truncate">
+                  {prizeItemName || prizeTitle || 'جایزه ویژه'}
+                </span>
               </div>
             ) : (
-              <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 col-span-2 shadow-md shadow-amber-950/50">
-                <span className="text-amber-300 font-extrabold flex items-center gap-1.5 text-sm sm:text-base shrink-0">
+              <div className="bg-amber-950/40 border border-amber-500/60 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between shadow-md">
+                <span className="text-amber-300 font-bold flex items-center gap-2">
                   <Coins className="w-5 h-5 text-amber-400 shrink-0" />
                   <span>{prizeLabel || 'وام'}:</span>
                 </span>
-                <div className="flex flex-col sm:items-end text-right sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono tracking-wider drop-shadow-md">
-                    {loanInfo?.numeric || '۰ ریال'}
-                  </div>
-                  {loanInfo?.words && (
-                    <div className="text-xs sm:text-sm font-bold text-amber-100/90 mt-0.5 tracking-normal">
-                      ({loanInfo.words})
-                    </div>
-                  )}
-                </div>
+                <span className="text-base sm:text-xl font-black text-amber-200 font-mono">
+                  {loanInfo?.numeric || '۰ ریال'}
+                </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* دکمه‌های تایید و ابطال */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-          {/* Confirm Button */}
           <button
             id="btn-confirm-winner"
             onClick={handleConfirm}
-            className="w-full sm:flex-1 py-3.5 px-6 rounded-xl font-bold text-base bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
+            className="w-full sm:flex-1 py-3.5 px-6 rounded-xl font-bold text-sm sm:text-base bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20 hover:scale-[1.01] active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5 text-slate-950" />
             <span>ثبت {winnerRankTitle} و حذف از لیست</span>
           </button>
 
-          {/* Redraw Button */}
           <button
             id="btn-redraw-winner"
             onClick={onDiscardAndRedraw}
-            className="w-full sm:w-auto py-3.5 px-5 rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
+            className="w-full sm:w-auto py-3.5 px-5 rounded-xl font-medium text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:scale-[1.01] active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
           >
             <RotateCcw className="w-4 h-4 text-slate-400" />
             <span>ابطال و قرعه مجدد</span>
           </button>
         </div>
 
-        <p className="text-[11px] text-slate-400 mt-4">
+        <p className="text-[11px] text-slate-400 mt-3">
           با کلیک روی «ثبت {winnerRankTitle}»، این برنده در بایگانی ثبت شده و از دورهای بعدی قرعه‌کشی حذف می‌شود.
         </p>
       </div>
